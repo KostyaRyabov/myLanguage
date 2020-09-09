@@ -9,6 +9,10 @@ Window {
     visible: true
     title: qsTr("Vecto..")
 
+    MyTranslator{
+        id: translator
+    }
+
     Canvas{
         id: drawingCanvas
         anchors.fill: parent
@@ -20,11 +24,18 @@ Window {
             ctx.strokeStyle = "red"
             ctx.beginPath()
 
+            for (let f = 0; f < translator.amountOfFigures(); f++){
+                for (let p = 0; p < translator.amountOfPointsOnFigure(f); p++){
+                }
+            }
+
             ctx.moveTo(drawingCanvas.width / 2, 0)
             ctx.lineTo((drawingCanvas.width / 2) + 40, 40)
 
             ctx.stroke()
         }
+
+        // update - drawingCanvas.requestPaint()
     }
 
     Rectangle{
@@ -42,9 +53,5 @@ Window {
 
             onTextChanged: translator.read(textInput.text)
         }
-    }
-
-    MyTranslator{
-        id: translator
     }
 }
