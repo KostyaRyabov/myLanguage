@@ -20,19 +20,23 @@ Window {
         onPaint: {
             var ctx = getContext("2d");
 
-            ctx.lineWidth = 15;
-            ctx.strokeStyle = "red"
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = "black"
             ctx.beginPath()
 
             for (let f = 0; f < translator.amountOfFigures(); f++){
-                for (let p = 0; p < translator.amountOfPointsOnFigure(f); p++){
+                ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
+                for (let p = 1; p < translator.amountOfPointsOnFigure(f); p++){
+                    ctx.beginPath();
+                    ctx.fillStyle = "red";
+                    ctx.arc(translator.getX(f,p), translator.getY(f,p), 30, 360, 0, false);
+                    ctx.lineTo(translator.getX(f,p), translator.getY(f,p));
+                    ctx.fill();
+
+                    ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
                 }
+                ctx.stroke()
             }
-
-            ctx.moveTo(drawingCanvas.width / 2, 0)
-            ctx.lineTo((drawingCanvas.width / 2) + 40, 40)
-
-            ctx.stroke()
         }
 
         // update - drawingCanvas.requestPaint()
