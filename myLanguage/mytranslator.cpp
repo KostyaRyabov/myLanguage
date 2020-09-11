@@ -13,11 +13,15 @@ void MyTranslator::clearState(){
     emit StateChanged();
 }
 
+bool MyTranslator::getDraw() const{
+    return draw;
+}
+
 QString MyTranslator::getState() const{
     return state;
 }
 
-void MyTranslator::throwErrow(QString text){
+void MyTranslator::throwError(QString text){
     state = text;
     emit StateChanged();
 }
@@ -40,17 +44,21 @@ int MyTranslator::getY(int FigureID, int PointID) const{
 
 void MyTranslator::read(QString text)
 {
-    text = text.replace(";"," ; ").replace("="," = ").replace("+"," + ").replace("-"," - ").replace("*"," * ").replace("/"," / ").replace("("," ( ").replace(")"," ) ").replace("["," [ ").replace("]"," ] ").replace("\n"," ").replace("\t"," ").replace(","," , ");
+    text = text.replace(";"," ; ").replace("="," = ").replace("+"," + ").replace("-"," - ").replace("*"," * ").replace("/"," / ").replace("("," ( ").replace(")"," ) ").replace("["," [ ").replace("]"," ] ").replace("\n"," ").replace("\t"," ").replace(","," , ").replace("{"," { ").replace("}"," } ");
     inputData = text.split(QLatin1Char(' '), Qt::SkipEmptyParts);
     word = inputData.begin();
 
     ObjList.clear();
+    Figures.clear();
+
+    draw = false;
 
     while (word != inputData.end()){
         if (!operation()) return;
     }
 
     clearState();
+    emit DrawChanged();
 }
 
 bool MyTranslator::is(QString tag, int offset){
@@ -71,13 +79,13 @@ bool MyTranslator::next(uint step){
 
 bool MyTranslator::varName(){
     if (!(*word)[0].isLetter()) {
-        throwErrow("имя переменной должно начинаться с буквы");
+        throwError("имя переменной должно начинаться с буквы");
         return false;
     }
 
     for (uint16_t i = 1; i < (*word).size(); i++){
         if (!(*word)[i].isLetterOrNumber()){
-            throwErrow("в имени переменной могут быть только буквы и символы");
+            throwError("в имени переменной могут быть только буквы и символы");
             return false;
         }
     }
@@ -87,13 +95,13 @@ bool MyTranslator::varName(){
 
 bool MyTranslator::initVariable(){
     if (!next()){
-        throwErrow("тут должно было быть имя переменной");
+        throwError("тут должно было быть имя переменной");
         return false;
     }
     if (!varName()) return false;
 
     if (ObjList.contains(*word)){
-        throwErrow("переменная " + *word + " уже обьявлена");
+        throwError("переменная " + *word + " уже обьявлена");
         return false;
     }
 
@@ -111,7 +119,7 @@ bool MyTranslator::operation(){
                 if (!rightPart(ObjList.last())) return false;       // только ошибка типов и несоответствие символов
                 qDebug() << "   result = " << ObjList.last().value;
             }else{
-                throwErrow("тут надо выдать значение");
+                throwError("тут надо выдать значение");
                 return false;
             }
         }
@@ -119,6 +127,44 @@ bool MyTranslator::operation(){
     }else if (is("move")){
     }else if (is("rotate")){
     }else if (is("draw")){
+        if (!is("(",1)){
+            throwError("тут открывающаяся скобка");
+            return false;
+        }
+        word++;
+
+        if (!next()) {
+            throwError("введите название фигуры");
+            return false;
+        }
+
+        if (!getVariable()) return false;
+        Figures << ObjList[*word].value.value<QList<QPoint>>();
+
+        if (!(is(",",1) || is(")",1))) {
+            throwError("продолжите список или завершите так ');'");
+            return false;
+        }
+
+        while (is(",",1)){
+            word++;
+
+            if (!next()) {
+                throwError("введите название фигуры");
+                return false;
+            }
+
+            if (!getVariable()) return false;
+            Figures << ObjList[*word].value.value<QList<QPoint>>();
+
+            if (!(is(",",1) || is(")",1))) {
+                throwError("продолжите список или завершите так ');'");
+                return false;
+            }
+        }
+
+        if (!next()) return false;
+        draw = true;
     }else if (getVariable()){
         if (is("=",1)){
             word++;
@@ -126,7 +172,7 @@ bool MyTranslator::operation(){
                 if (!rightPart(ObjList[*(word-2)])) return false;       // только ошибка типов и несоответствие символов
                 qDebug() << "   result = " << ObjList.last().value;
             }else{
-                throwErrow("тут надо выдать значение");
+                throwError("тут надо выдать значение");
                 return false;
             }
         }else if (is("+",1) && is("=",2)){
@@ -145,7 +191,7 @@ bool MyTranslator::operation(){
                 }
                 qDebug() << "   result = " << ObjList.last().value;
             }else{
-                throwErrow("тут надо выдать значение");
+                throwError("тут надо выдать значение");
                 return false;
             }
         }else if (is("-",1) && is("=",2)){
@@ -164,7 +210,7 @@ bool MyTranslator::operation(){
                 }
                 qDebug() << "   result = " << ObjList.last().value;
             }else{
-                throwErrow("тут надо выдать значение");
+                throwError("тут надо выдать значение");
                 return false;
             }
         }else if (is("*",1) && is("=",2)){
@@ -183,7 +229,7 @@ bool MyTranslator::operation(){
                 }
                 qDebug() << "   result = " << ObjList.last().value;
             }else{
-                throwErrow("тут надо выдать значение");
+                throwError("тут надо выдать значение");
                 return false;
             }
         }else if (is("/",1) && is("=",2)){
@@ -196,7 +242,7 @@ bool MyTranslator::operation(){
                 if (result.type == "int"){
                     if (tmp.type == "int"){
                         if (tmp.value.toInt() == 0) {
-                            throwErrow("нельзя делить на 0");
+                            throwError("нельзя делить на 0");
                             return false;
                         }
 
@@ -207,17 +253,17 @@ bool MyTranslator::operation(){
                 }
                 qDebug() << "   result = " << ObjList.last().value;
             }else{
-                throwErrow("тут надо выдать значение");
+                throwError("тут надо выдать значение");
                 return false;
             }
         }
     }else{
-        throwErrow("переменная " + *word + " не обьявлена\nожидалось то то-то");
+        throwError("переменная " + *word + " не обьявлена\nожидалось то то-то");
         return false;
     }
 
     if (!is(";",1)){
-        throwErrow("ожидалось ';'");
+        throwError("ожидалось ';'");
         return false;
     }
 
@@ -235,7 +281,9 @@ bool MyTranslator::rightPart(t_Variable &result){
 
     if (!block(result)) return false;
 
-    if (minus) result.value.setValue(-result.value.toInt());
+    if (minus) {
+        result.value.setValue(-result.value.toInt());
+    }
 
     t_Variable tmp;
 
@@ -293,7 +341,7 @@ bool MyTranslator::block(t_Variable &result){
             if (result.type == "int"){
                 if (tmp.type == "int"){
                     if (tmp.value.toInt() == 0) {
-                        throwErrow("нельзя делить на 0");
+                        throwError("нельзя делить на 0");
                         return false;
                     }
                     result.value.setValue(result.value.toInt() / tmp.value.toInt());
@@ -305,57 +353,171 @@ bool MyTranslator::block(t_Variable &result){
     return true;
 }
 
-bool MyTranslator::isNum(t_Variable &result){
+bool MyTranslator::getNum(t_Variable &result){
     bool ok;
     result.value.setValue<int>((*word).toInt(&ok, 10));
 
     return ok;
 }
 
-bool MyTranslator::part(t_Variable &result){
-   if (is("(")){
-        if (!next()) return false;
-        if (!rightPart(result)) return false;
+bool MyTranslator::getPoint(t_Variable &result){
+    if (!is("(")){
+        throwError("тут ваша точка");
+        return false;
+    }
 
-        if (is(",",1)){
-            if (result.type == "int"){
-                word++;
-                t_Variable tmp;
-                if (!next()) return false;
-                if (!rightPart(tmp)) return false;
-                if (tmp.type == "int"){
-                    if (is(")",1)){
-                        if (!next()) return false;
+    if (!next()){
+        throwError("тут должно быть целое число");
+        return false;
+    }
 
-                        // оформляем точку
-                        result.type = "point";
-                        result.value.setValue(QPoint(result.value.toInt(),tmp.value.toInt()));
+    t_Variable tmp;
+    if (!rightPart(tmp)) return false;
 
-                        // если еще запятая - это фигура
-                    }else{
-                        throwErrow("после " + *word + "должна быть закрывающая скобка");
-                        return false;
-                    }
-                }
+    if (tmp.type != "int"){
+        throwError("тут должно быть целое число");
+        return false;
+    }
 
-                // добавление еще точек
-                if (is(",",1)){
+    if (!is(",",1)) {
+        throwError("тут должен быть символ ','");
+        return false;
+    }
+    word++;
 
-                }
-            }
-        }else if (is(")",1)){
-            if (!next()) return false;
-        }else{
-            throwErrow("после " + *word + "должна быть закрывающая скобка");
+    if (!next()){
+        throwError("тут должно быть целое число");
+        return false;
+    }
+
+     QPoint tmp_point;
+     tmp_point.setX(tmp.value.toInt());
+
+     if (!rightPart(tmp)) return false;
+
+     if (tmp.type != "int"){
+         throwError("тут должно быть целое число");
+         return false;
+     }
+
+     if (!is(")",1)){
+         throwError("после " + *word + "должна быть закрывающая скобка");
+         return false;
+     }
+     word++;
+
+     // оформляем точку
+     tmp_point.setY(tmp.value.toInt());
+     result.value.setValue(tmp_point);
+
+     return true;
+}
+
+bool MyTranslator::getFigure(t_Variable &result){
+    if (!is("{")){
+        throwError("начало фигуры");
+        return false;
+    }
+
+    if (!next()) return false;
+
+    t_Variable tmp;
+
+    if (!getPoint(tmp)) return false;
+
+    QList<QPoint> tmp_fig;
+    tmp_fig << tmp.value.toPoint();
+
+    // добавление еще точек
+    while (is(",",1)){
+        word++;
+        if (!next()){
+            throwError("тут ваша точа");
             return false;
         }
-    }else if (isNum(result)){
+        if (!getPoint(tmp)) return false;
+        tmp_fig << tmp.value.toPoint();
+    }
+
+    result.value.setValue(tmp_fig);
+
+    if (!is("}",1)){
+        throwError("продолжите список точек или завершите сиволом '}'");
+        return false;
+    }
+    word++;
+}
+
+bool MyTranslator::getVector(t_Variable &result){
+    if (!is("[")) {
+        throwError("начало вектора");
+        return false;
+    }
+
+    if (!next()){
+        throwError("тут должно быть целое число");
+        return false;
+    }
+
+    t_Variable tmp;
+    if (!rightPart(tmp)) return false;
+
+    if (tmp.type != "int"){
+        throwError("тут должно быть целое число");
+        return false;
+    }
+
+    if (!is(",",1)) {
+        throwError("тут должен быть символ ','");
+        return false;
+    }
+    word++;
+
+    if (!next()){
+        throwError("тут должно быть целое число");
+        return false;
+    }
+
+     QPoint tmp_point;
+     tmp_point.setX(tmp.value.toInt());
+
+     if (!rightPart(tmp)) return false;
+
+     if (tmp.type != "int"){
+         throwError("тут должно быть целое число");
+         return false;
+     }
+
+     if (!is("]",1)){
+         throwError("после " + *word + "должна быть закрывающая скобка");
+         return false;
+     }
+     word++;
+
+     // оформляем точку
+     tmp_point.setY(tmp.value.toInt());
+     result.value.setValue(tmp_point);
+
+     return true;
+}
+
+bool MyTranslator::part(t_Variable &result){
+    if (is("(")){
+        if (!getPoint(result)) return false;
+        result.type = "point";
+    }else if (is("{")){
+        if (!getFigure(result)) return false;
+        result.type = "figure";
+    }else if (is("[")){          // vector
+        if (!getVector(result)) return false;
+        result.type = "vector";
+    }else if (getNum(result)){
         result.type = "int";
-        qDebug() << "           isNum(" << result.value.toString() << ")";
-    }else{
-        if (getVariable()){
-            result = ObjList[*word];
-        }else return false;
+    }else if (getVariable()){
+        result = ObjList[*word];
+    }else {
+        throwError("где сука ответ?");
+        return false;
     }
 
     return true;
@@ -365,7 +527,7 @@ bool MyTranslator::getVariable(){
     if (!varName()) return false;
 
     if (!ObjList.contains(*word)){
-        throwErrow("переменная " + *word + " не существует");
+        throwError("переменная " + *word + " не существует");
         return false;
     }
 

@@ -16,6 +16,7 @@ Window {
 
         onPaint: {
             var ctx = getContext("2d");
+            ctx.reset()
 
             ctx.lineWidth = 2;
             ctx.strokeStyle = "black"
@@ -23,6 +24,7 @@ Window {
 
             for (let f = 0; f < translator.amountOfFigures(); f++){
                 ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
+                console.log("       f")
                 for (let p = 1; p < translator.amountOfPointsOnFigure(f); p++){
                     /*
                     ctx.beginPath();
@@ -32,6 +34,7 @@ Window {
                     ctx.fill();
 */
                     ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
+                    console.log("       p")
                 }
 
                 ctx.stroke()
@@ -80,6 +83,12 @@ Window {
                     messageBox.state = "active"
                 }else{
                     messageBox.state = "passive"
+                }
+            }
+
+            onDrawChanged: {
+                if (translator.amountOfFigures() > 0){
+                    drawingCanvas.requestPaint()
                 }
             }
         }

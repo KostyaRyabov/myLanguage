@@ -14,10 +14,9 @@ class MyTranslator: public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString state READ getState NOTIFY StateChanged)
+    Q_PROPERTY(bool draw READ getDraw NOTIFY DrawChanged)
 public:
     explicit MyTranslator(QObject *parent = nullptr);
-
-    //QHash<int, QByteArray> roleNames() const;
 
     Q_INVOKABLE int amountOfFigures() const;
     Q_INVOKABLE int amountOfPointsOnFigure(int i) const;
@@ -29,9 +28,12 @@ public:
 
     Q_INVOKABLE bool isError() const;
     Q_INVOKABLE QString getState() const;
-    void throwErrow(QString text);
+    void throwError(QString text);
     void clearState();
+
+    Q_INVOKABLE bool getDraw() const;
 private:
+    bool draw;
     QString state;
 
     QStringList inputData;     // split input text into parts
@@ -39,7 +41,10 @@ private:
 
     bool next(uint step = 1);
     bool is(QString tag, int offset = 0);
-    bool isNum(t_Variable &result);
+    bool getNum(t_Variable &result);
+    bool getPoint(t_Variable &result);
+    bool getFigure(t_Variable &result);
+    bool getVector(t_Variable &result);
 
     bool operation();
 
@@ -52,10 +57,11 @@ private:
     bool part(t_Variable &result);
 
     QList<QList<QPoint>> Figures;
-    QMap<QString, t_Variable> ObjList;
+    QMap<QString, t_Variable> ObjList;          // + figure pointers
 
 signals:
     Q_INVOKABLE void StateChanged();
+    Q_INVOKABLE void DrawChanged();
 };
 
 #endif // MYTRANSLATOR_H
