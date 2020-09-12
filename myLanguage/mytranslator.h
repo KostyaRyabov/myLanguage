@@ -10,6 +10,8 @@ struct t_Variable{
     QVariant value;
 };
 
+Q_DECLARE_METATYPE(t_Variable);
+
 class MyTranslator: public QObject
 {
     Q_OBJECT
@@ -59,6 +61,7 @@ private:
     QList<QList<QPoint>> Figures;
     QMap<QString, t_Variable> ObjList;          // + figure pointers
 
+    QString CutWord(QString &str);
 signals:
     Q_INVOKABLE void StateChanged();
     Q_INVOKABLE void DrawChanged();

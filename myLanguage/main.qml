@@ -1,12 +1,13 @@
 import QtQuick 2.12
 import QtQuick.Window 2.12
+import QtQuick.Controls 2.12
 
 import Translator 1.0
 
 Window {
     id: window
-    width: 800
-    height: 400
+    width: 1000
+    height: 600
     visible: true
     title: qsTr("Vecto..")
 
@@ -20,28 +21,39 @@ Window {
 
             ctx.lineWidth = 2;
             ctx.strokeStyle = "black"
-            ctx.beginPath()
 
             for (let f = 0; f < translator.amountOfFigures(); f++){
-                ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
-                console.log("       f")
-                for (let p = 1; p < translator.amountOfPointsOnFigure(f); p++){
-                    /*
-                    ctx.beginPath();
-                    ctx.fillStyle = "red";
-                    ctx.arc(translator.getX(f,p), translator.getY(f,p), 30, 360, 0, false);
-                    ctx.lineTo(translator.getX(f,p), translator.getY(f,p));
-                    ctx.fill();
-*/
-                    ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
-                    console.log("       p")
-                }
+                if (translator.amountOfPointsOnFigure(f) > 0){
 
-                ctx.stroke()
+                    var p = 1;
+
+                    if (translator.amountOfPointsOnFigure(f) > 1){
+                        ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
+                        for (; p < translator.amountOfPointsOnFigure(f); p++){
+                            ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
+                        }
+
+                        p--;
+
+                        if (translator.getX(f,p) === translator.getX(f,0) && translator.getY(f,p) === translator.getY(f,0)){
+                            ctx.fillStyle = "rgba(255, 136, 26, 0.4)";
+                            ctx.fill();
+                        }
+
+                        ctx.stroke()
+                    }
+
+                    ctx.fillStyle = "rgba(255, 26, 26, 0.4)";
+
+                    for (p = 0; p < translator.amountOfPointsOnFigure(f); p++){
+                        ctx.beginPath();
+                        ctx.arc(translator.getX(f,p), translator.getY(f,p), 4, 360, 0, false);
+                        ctx.fill();
+                        ctx.stroke()
+                    }
+                }
             }
         }
-
-        // update - drawingCanvas.requestPaint()
     }
 
     Rectangle{
@@ -52,13 +64,21 @@ Window {
 
         color: "#BADBDE"
 
-        TextEdit{
-            id: textInput
+        Flickable {
             anchors.fill: parent
-            textMargin: 10
-            font.pointSize: 12
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar {}
 
-            onTextChanged: translator.read(textInput.text)
+            TextArea.flickable: TextArea{
+                anchors.margins: 10
+                id: textInput
+                wrapMode: TextEdit.Wrap
+
+                font.pointSize: 12
+                selectByMouse: true
+
+                onTextChanged: translator.read(textInput.text)
+            }
         }
     }
 
@@ -87,9 +107,7 @@ Window {
             }
 
             onDrawChanged: {
-                if (translator.amountOfFigures() > 0){
-                    drawingCanvas.requestPaint()
-                }
+                drawingCanvas.requestPaint()
             }
         }
 
@@ -122,6 +140,8 @@ Window {
         Text{
             id: errorOutput
             color: "black"
+
+            wrapMode: Text.Wrap
 
             font.pointSize: 12
             anchors.fill: parent
