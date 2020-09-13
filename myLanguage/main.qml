@@ -7,7 +7,7 @@ import Translator 1.0
 Window {
     id: window
     width: 1000
-    height: 600
+    height: 400
     visible: true
     title: qsTr("Vecto..")
 
@@ -69,18 +69,40 @@ Window {
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {}
 
-            TextArea.flickable: TextArea{
-                anchors.margins: 10
-                id: textInput
-                wrapMode: TextEdit.Wrap
+            FontMetrics {
+                id: fontMetrics
+                font: textInput.font
+            }
 
+            Rectangle {
+                x: 0; y: textInput.cursorRectangle.y
+                height: fontMetrics.height
+                width: textInput.width
+                color: "#8dc3c8"
+                visible: textInput.activeFocus
+            }
+
+            TextArea.flickable: TextArea{
+                id: textInput
+
+                placeholderText: qsTr("Введите команду...")
+
+                onTextChanged: {
+                    console.log(textInput.text)
+                    translator.read(getText(0,textInput.length))
+                }
+
+                textFormat: TextEdit.RichText
+                text: ""
+
+                anchors.margins: 10
+                wrapMode: TextEdit.Wrap
                 font.pointSize: 12
                 selectByMouse: true
-
-                onTextChanged: translator.read(textInput.text)
             }
         }
     }
+
 
     Rectangle{
         id: messageBox
@@ -96,18 +118,24 @@ Window {
 
         MyTranslator{
             id: translator
+            textDocument: textInput.textDocument
 
-            onStateChanged:{
-                if (translator.isError()){
-                    errorOutput.text = translator.getState()
-                    messageBox.state = "active"
-                }else{
-                    messageBox.state = "passive"
-                }
+            onGetError: {
+                messageBox.state = "active"
+                errorOutput.text = text
+
+                var p = textInput.cursorPosition
+                textInput.text = newText
+                textInput.cursorPosition = p
             }
 
             onDrawChanged: {
+                messageBox.state = "passive"
                 drawingCanvas.requestPaint()
+
+                var p = textInput.cursorPosition
+                textInput.text = textInput.getText(0,textInput.length)
+                textInput.cursorPosition = p
             }
         }
 

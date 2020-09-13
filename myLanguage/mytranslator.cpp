@@ -1,29 +1,88 @@
 #include "mytranslator.h"
 
-MyTranslator::MyTranslator(QObject *parent) : QObject(parent)
+MyTranslator::MyTranslator(QObject *parent)  :
+    QSyntaxHighlighter(parent),
+    m_TextDocument(nullptr)
 {
 }
 
-bool MyTranslator::isError() const{
-    return !state.isEmpty();
+void MyTranslator::read(QString text){
+    if (store == text) return;
+    store = text;
+
+    inputData = text.
+            replace(";"," ; ").replace("="," = ").replace("+"," + ").replace("-"," - ").
+            replace("*"," * ").replace("/"," / ").replace("("," ( ").replace(")"," ) ").
+            replace("["," [ ").replace("]"," ] ").replace("\t"," ").
+            replace(","," , ").replace("{"," { ").replace("}"," } ").split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    word = inputData.begin();
+
+    ObjList.clear();
+    Figures.clear();
+
+    draw = false;
+
+    while (word != inputData.end()){
+        if (!operation()) return;
+    }
+
+    emit DrawChanged();
 }
 
-void MyTranslator::clearState(){
-    state = "";
-    emit StateChanged();
+void MyTranslator::highlightBlock( const QString &text )
+{
+    Q_UNUSED(text)
+    emit highlightBlock(QVariant(m_TextDocument->textDocument()->toRawText()));
 }
+
+QQuickTextDocument* MyTranslator::textDocument() const
+{
+    QTextDocument* doc = m_TextDocument->textDocument();
+    qDebug() << doc->toRawText();
+
+    return m_TextDocument;
+}
+
+void MyTranslator::setTextDocument( QQuickTextDocument* textDocument )
+{
+    if (textDocument == m_TextDocument)
+    {
+        return;
+    }
+
+    m_TextDocument = textDocument;
+
+    QTextDocument* doc = m_TextDocument->textDocument();
+    setDocument(doc);
+
+    emit textDocumentChanged();
+}
+
+void MyTranslator::setFormat( int start, int count, const QVariant& format )
+{
+
+}
+
+
 
 bool MyTranslator::getDraw() const{
     return draw;
 }
 
-QString MyTranslator::getState() const{
-    return state;
-}
-
 void MyTranslator::throwError(QString text){
-    state = text;
-    emit StateChanged();
+    int idx = 0;
+    int i = word - inputData.begin();
+
+    QString raw = m_TextDocument->textDocument()->toRawText();
+
+    for (; i > 0; i--){
+         idx += (*(word - i)).length();
+         while (raw[idx+1] == " ") idx++;
+    }
+
+    //emit getError(text, raw.left(idx) + "<font color=\"red\">" + raw.mid(idx) + "</font>");
+    emit getError(text, raw.left(idx) + "<b>" + raw.mid(idx) + "</b>");
 }
 
 int MyTranslator::amountOfFigures() const{
@@ -42,24 +101,6 @@ int MyTranslator::getY(int FigureID, int PointID) const{
     return Figures[FigureID][PointID].y();
 }
 
-void MyTranslator::read(QString text)
-{
-    text = text.replace(";"," ; ").replace("="," = ").replace("+"," + ").replace("-"," - ").replace("*"," * ").replace("/"," / ").replace("("," ( ").replace(")"," ) ").replace("["," [ ").replace("]"," ] ").replace("\n"," ").replace("\t"," ").replace(","," , ").replace("{"," { ").replace("}"," } ");
-    inputData = text.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    word = inputData.begin();
-
-    ObjList.clear();
-    Figures.clear();
-
-    draw = false;
-
-    while (word != inputData.end()){
-        if (!operation()) return;
-    }
-
-    clearState();
-    emit DrawChanged();
-}
 
 bool MyTranslator::is(QString tag, int offset){
     for(int i = 1; i <= offset; i++){
@@ -106,6 +147,7 @@ bool MyTranslator::initVariable(){
     }
 
     ObjList.insert(*word, {*(word-1), QVariant(NULL)});
+
     return true;
 }
 
@@ -261,7 +303,6 @@ bool MyTranslator::rightPart(t_Variable &result){
     if (!block(result)) return false;
 
     if (result.type == "figure")
-        qDebug() << ">>>>>>" << result.value.value<QList<QPoint>>();
 
     if (minus) {
         if (result.type == "int"){
@@ -413,8 +454,6 @@ bool MyTranslator::rightPart(t_Variable &result){
                 }else if (tmp.type == "point"){
                     QList<QPoint> res_fig = result.value.value<QList<QPoint>>();
                     QPoint tmp_point = tmp.value.toPoint();
-
-                    qDebug() << res_fig << " || " << tmp_point;
 
                     if (res_fig.removeOne(tmp_point)){
                         qDebug() << "remove point";
@@ -761,8 +800,6 @@ bool MyTranslator::getFigure(t_Variable &result){
 
     t_Variable tmp;
 
-    qDebug() << "word = " << *word;
-
     if (varName()){
         tmp = ObjList[*word];
 
@@ -872,9 +909,7 @@ bool MyTranslator::getVector(t_Variable &result){
 bool MyTranslator::part(t_Variable &result){
     if (is("(")){
         if (is(",",2) && is(")",4)){
-            qDebug() << "get";
             if (!getPoint(result)) return false;
-            qDebug() << "getPoint";
         }else{
             if (!next()){
                 throwError("введите выражение в скобках");

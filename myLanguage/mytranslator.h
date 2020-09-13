@@ -5,6 +5,11 @@
 #include <QPoint>
 #include <QDebug>
 
+#include <QTextDocument>
+#include <QSyntaxHighlighter>
+#include <QQuickTextDocument>
+#include <string>
+
 struct t_Variable{
     QString type;
     QVariant value;
@@ -12,13 +17,17 @@ struct t_Variable{
 
 Q_DECLARE_METATYPE(t_Variable);
 
-class MyTranslator: public QObject
+class MyTranslator: public QSyntaxHighlighter
 {
     Q_OBJECT
-    Q_PROPERTY(QString state READ getState NOTIFY StateChanged)
+    Q_PROPERTY(QQuickTextDocument* textDocument READ textDocument WRITE setTextDocument NOTIFY textDocumentChanged)
     Q_PROPERTY(bool draw READ getDraw NOTIFY DrawChanged)
 public:
     explicit MyTranslator(QObject *parent = nullptr);
+
+    Q_INVOKABLE void setFormat(int start, int count, const QVariant& format);
+
+    Q_INVOKABLE void read(QString text);
 
     Q_INVOKABLE int amountOfFigures() const;
     Q_INVOKABLE int amountOfPointsOnFigure(int i) const;
@@ -26,17 +35,12 @@ public:
     Q_INVOKABLE int getX(int FigureID, int PointID) const;
     Q_INVOKABLE int getY(int FigureID, int PointID) const;
 
-    Q_INVOKABLE void read(QString text);
-
-    Q_INVOKABLE bool isError() const;
-    Q_INVOKABLE QString getState() const;
     void throwError(QString text);
-    void clearState();
 
     Q_INVOKABLE bool getDraw() const;
 private:
     bool draw;
-    QString state;
+    QString store;
 
     QStringList inputData;     // split input text into parts
     QStringList::iterator word;
@@ -59,12 +63,22 @@ private:
     bool part(t_Variable &result);
 
     QList<QList<QPoint>> Figures;
-    QMap<QString, t_Variable> ObjList;          // + figure pointers
+    QMap<QString, t_Variable> ObjList;
 
     QString CutWord(QString &str);
+protected:
+    QQuickTextDocument* m_TextDocument;
+
+    QQuickTextDocument* textDocument() const;
+    void setTextDocument(QQuickTextDocument* textDocument);
+
+    virtual void highlightBlock(const QString &text);
 signals:
-    Q_INVOKABLE void StateChanged();
-    Q_INVOKABLE void DrawChanged();
+    void textDocumentChanged();
+    void highlightBlock(const QVariant& text);
+
+    void getError(QString text, QString newText);
+    void DrawChanged();
 };
 
 #endif // MYTRANSLATOR_H
