@@ -56,7 +56,7 @@ private:
     bool part(t_Variable &result);
 
     QList<QList<QPointF>> Figures;
-    QMap<QString, t_Variable> ObjList;
+    QHash<QString, t_Variable> ObjList;
 
     QString CutWord(QString &str);
 signals:

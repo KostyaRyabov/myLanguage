@@ -80,11 +80,6 @@ bool MyTranslator::next(uint step){
 }
 
 bool MyTranslator::varName(){
-    if (is("figure") || is("float") || is("vector") || is("point") || is("draw") || is("rotate")){
-        throwError("нельзя называть обьекты служебными именами");
-        return false;
-    }
-
     if (!(*word)[0].isLetter()) {
         throwError("имя переменной должно начинаться с буквы");
         return false;
@@ -112,10 +107,7 @@ bool MyTranslator::initVariable(){
         return false;
     }
 
-    // глянуть позже
     ObjList.insert(*word, {*(word-1), QVariant()});
-
-    qDebug() << ObjList.keys();
 
     return true;
 }
@@ -124,7 +116,7 @@ bool MyTranslator::operation(){
     if (is("figure") || is("float") || is("vector") || is("point")){
         if (!initVariable()) return false;
 
-        auto &obj = ObjList.last();
+        auto &obj = ObjList[*word];
         obj.type = *(word-1);
 
         if (is("=",1)){
@@ -829,8 +821,6 @@ bool MyTranslator::getVector(t_Variable &result){
 }
 
 bool MyTranslator::part(t_Variable &result){
-    // if (result.type == "float") и если строка оборвана - выводить характерные сообщения...
-
     if (is("(")){
         if (!next()){
             throwError("после '(' должно быть число");
