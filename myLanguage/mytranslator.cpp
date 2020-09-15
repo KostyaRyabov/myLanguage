@@ -80,6 +80,12 @@ bool MyTranslator::next(uint step){
 }
 
 bool MyTranslator::varName(){
+    if (is("figure") || is("float") || is("vector") || is("point") || is("draw") || is("rotate")){
+        throwError("нельзя называть обьекты служебными именами");
+        return false;
+    }
+
+
     if (!(*word)[0].isLetter()) {
         throwError("имя переменной должно начинаться с буквы");
         return false;
@@ -134,34 +140,66 @@ bool MyTranslator::operation(){
 
     }else if (is("rotate")){
         if (!is("(",1)){
-            throwError("тут открывающаяся скобка");
+            throwError("после слова '"+*word+"' должна быть открывающая скобка '('");
             return false;
         }
         word++;
 
         if (!next()) {
-            throwError("введите название фигуры");
+            throwError("функция 'rotate' должна быть обьявлена с 1м параметром фигурой и со 2м - числом для ее повората по часовой стрелке в градусах");
             return false;
         }
 
-        t_Variable obj;
+        t_Variable obj, R;
 
-        if (getVariable()){
-            obj = ObjList[*word];
+        if (!getVariable()) return false;
+        QString var = *word;
+        obj = ObjList[var];
 
-            if (obj.type != "float") {
-                throwError("'" + *word + "' не является фигурой");
-                return false;
-            }
-        }else{
-            obj.type = "float";
-            if (!rightPart(obj)) return false;
-        }
-
-        if (!is("(",1)){
-            throwError("тут закрывающаяся скобка");
+        if (obj.type != "figure"){
+            throwError("переменная '" + *word + "' не является фигурой или точкой");
             return false;
         }
+
+        if (!(is(",",1))) {
+            throwError("после '"+*word+"' должна быть запятая");
+            return false;
+        }
+        word++;
+
+        if(!next()) {
+            throwError("после запятой должно быть число\n(угол поворота фигуры по часовой стрелке)");
+            return false;
+        }
+
+        R.type = "float";
+        if (!rightPart(R)) return false;
+
+        QPointF o;
+        auto list = obj.value.value<QList<QPointF>>();
+
+        for (auto &p : list){
+            o.setX(o.x() + p.x());
+            o.setY(o.y() + p.y());
+        }
+
+        o.setX(o.x() / list.size());
+        o.setY(o.y() / list.size());
+
+        float radians = R.value.toFloat() * 3.14159265 / 180;
+
+        for (auto &p : list){
+            p.setX((p.x() - o.x()) * cos(radians) - (p.y() - o.y()) * sin(radians) + o.x());
+            p.setY((p.x() - o.x()) * sin(radians) + (p.y() - o.y()) * cos(radians) + o.y());
+        }
+
+        if (!(is(")",1))) {
+            throwError("после '"+*word+"' должна быть закрывающая круглая скобка");
+            return false;
+        }
+
+        obj.value.setValue(list);
+        ObjList[var] = obj;
         word++;
     }else if (is("draw")){
         if (!is("(",1)){

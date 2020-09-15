@@ -5,6 +5,7 @@
 #include <QPoint>
 #include <QDebug>
 #include <QTextDocumentFragment>
+#include <math.h>
 
 struct t_Variable{
     QString type;
