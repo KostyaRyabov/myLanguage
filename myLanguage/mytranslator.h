@@ -4,28 +4,21 @@
 #include <QObject>
 #include <QPoint>
 #include <QDebug>
-
-#include <QTextDocument>
-#include <QSyntaxHighlighter>
-#include <QQuickTextDocument>
-#include <string>
+#include <QTextDocumentFragment>
 
 struct t_Variable{
     QString type;
     QVariant value;
 };
 
-Q_DECLARE_METATYPE(t_Variable);
+Q_DECLARE_METATYPE(t_Variable)
 
-class MyTranslator: public QSyntaxHighlighter
+class MyTranslator: public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QQuickTextDocument* textDocument READ textDocument WRITE setTextDocument NOTIFY textDocumentChanged)
     Q_PROPERTY(bool draw READ getDraw NOTIFY DrawChanged)
 public:
     explicit MyTranslator(QObject *parent = nullptr);
-
-    Q_INVOKABLE void setFormat(int start, int count, const QVariant& format);
 
     Q_INVOKABLE void read(QString text);
 
@@ -42,7 +35,7 @@ private:
     bool draw;
     QString store;
 
-    QStringList inputData;     // split input text into parts
+    QStringList inputData;
     QStringList::iterator word;
 
     bool next(uint step = 1);
@@ -62,22 +55,12 @@ private:
     bool block(t_Variable &result);
     bool part(t_Variable &result);
 
-    QList<QList<QPoint>> Figures;
+    QList<QList<QPointF>> Figures;
     QMap<QString, t_Variable> ObjList;
 
     QString CutWord(QString &str);
-protected:
-    QQuickTextDocument* m_TextDocument;
-
-    QQuickTextDocument* textDocument() const;
-    void setTextDocument(QQuickTextDocument* textDocument);
-
-    virtual void highlightBlock(const QString &text);
 signals:
-    void textDocumentChanged();
-    void highlightBlock(const QVariant& text);
-
-    void getError(QString text, QString newText);
+    void getError(QString text, int pos);
     void DrawChanged();
 };
 

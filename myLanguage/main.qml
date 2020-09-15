@@ -7,7 +7,7 @@ import Translator 1.0
 Window {
     id: window
     width: 1000
-    height: 400
+    height: 500
     visible: true
     title: qsTr("Vecto..")
 
@@ -65,8 +65,14 @@ Window {
         color: "#BADBDE"
 
         Flickable {
+            id:flic
             anchors.fill: parent
             boundsBehavior: Flickable.StopAtBounds
+
+            visibleArea.onYPositionChanged: {
+                errorRect.y = p.y + codeArea.y + textInput.y - flic.contentY
+            }
+
             ScrollBar.vertical: ScrollBar {}
 
             FontMetrics {
@@ -80,6 +86,10 @@ Window {
                 width: textInput.width
                 color: "#8dc3c8"
                 visible: textInput.activeFocus
+
+                 Behavior on y{
+                    NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 }
+                }
             }
 
             TextArea.flickable: TextArea{
@@ -88,12 +98,8 @@ Window {
                 placeholderText: qsTr("Введите команду...")
 
                 onTextChanged: {
-                    console.log(textInput.text)
-                    translator.read(getText(0,textInput.length))
+                    translator.read(textInput.text)
                 }
-
-                textFormat: TextEdit.RichText
-                text: ""
 
                 anchors.margins: 10
                 wrapMode: TextEdit.Wrap
@@ -103,6 +109,29 @@ Window {
         }
     }
 
+    Rectangle{
+        id:errorRect
+
+        property rect p: [0,0,0,0]
+
+        x: p.x + codeArea.x + textInput.x
+        y: p.y + codeArea.y + textInput.y - flic.contentY
+        width: codeArea.x - p.x - 10
+        height: p.height
+
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+
+            GradientStop { position: 0.0; color: "transparent" }
+            GradientStop { position: 0.01; color: "red" }
+            GradientStop { position: 0.8; color: "transparent" }
+        }
+
+        Behavior on width{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
+        Behavior on x{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
+        //Behavior on y{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
+        Behavior on opacity{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 1000 } }
+    }
 
     Rectangle{
         id: messageBox
@@ -118,24 +147,20 @@ Window {
 
         MyTranslator{
             id: translator
-            textDocument: textInput.textDocument
+
 
             onGetError: {
                 messageBox.state = "active"
                 errorOutput.text = text
 
-                var p = textInput.cursorPosition
-                textInput.text = newText
-                textInput.cursorPosition = p
+                errorRect.p = textInput.positionToRectangle(pos)
+                errorRect.opacity = 0.3
             }
 
             onDrawChanged: {
                 messageBox.state = "passive"
                 drawingCanvas.requestPaint()
-
-                var p = textInput.cursorPosition
-                textInput.text = textInput.getText(0,textInput.length)
-                textInput.cursorPosition = p
+                errorRect.opacity = 0
             }
         }
 

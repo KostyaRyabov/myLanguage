@@ -1,4 +1,4 @@
-QT += quick core
+QT += quick core gui
 
 CONFIG += c++11
 
