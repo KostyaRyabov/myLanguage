@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QTextDocumentFragment>
 #include <math.h>
+#include <limits>
 
 struct t_Variable{
     QString type;
@@ -60,6 +61,13 @@ private:
     QHash<QString, t_Variable> ObjList;
 
     QString CutWord(QString &str);
+
+    QPointF getCenter(QList<QPointF> &figure);
+    bool isFilledFigure(QList<QPointF> &figure) const;
+    bool isInside(QPointF &point, QList<QPointF> &figure);
+    int Intersection(QPointF &a1,QPointF &a2, QList<QPointF> &figure, QPointF *p = nullptr);
+    int getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figure);
+    int getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure);
 signals:
     void getError(QString text, int pos);
     void DrawChanged();

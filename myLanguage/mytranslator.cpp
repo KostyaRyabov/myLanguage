@@ -188,9 +188,11 @@ bool MyTranslator::operation(){
 
         float radians = R.value.toFloat() * 3.14159265 / 180;
 
-        for (auto &p : list){
-            p.setX((p.x() - o.x()) * cos(radians) - (p.y() - o.y()) * sin(radians) + o.x());
-            p.setY((p.x() - o.x()) * sin(radians) + (p.y() - o.y()) * cos(radians) + o.y());
+        for (auto &_p : list){
+            auto p = _p;
+
+            _p.setX((p.x() - o.x()) * cos(radians) - (p.y() - o.y()) * sin(radians) + o.x());
+            _p.setY((p.x() - o.x()) * sin(radians) + (p.y() - o.y()) * cos(radians) + o.y());
         }
 
         if (!(is(")",1))) {
@@ -214,9 +216,7 @@ bool MyTranslator::operation(){
         }
 
         t_Variable obj;
-
-        if (getVariable()) obj = ObjList[*word];
-        else if (!rightPart(obj)) return false;
+        if (!rightPart(obj)) return false;
 
         if (obj.type == "point"){
             Figures << QList<QPointF>({obj.value.toPointF()});
@@ -240,8 +240,8 @@ bool MyTranslator::operation(){
                 return false;
             }
 
-            if (getVariable()) obj = ObjList[*word];
-            else if (!rightPart(obj)) return false;
+            obj.type.clear();
+            if (!rightPart(obj)) return false;
 
             if (obj.type == "point"){
                 Figures << QList<QPointF>({obj.value.toPointF()});
@@ -286,6 +286,161 @@ bool MyTranslator::operation(){
     word+=2;
     return true;
 }
+
+QPointF MyTranslator::getCenter(QList<QPointF> &figure){
+    QPointF o;
+    int size = figure.size()-1;
+
+    for (int i = 0; i < size; i++){
+        o.setX(o.x() + figure[i].x());
+        o.setY(o.y() + figure[i].y());
+    }
+
+    o.setX(o.x() / size);
+    o.setY(o.y() / size);
+
+    return o;
+}
+
+bool MyTranslator::isFilledFigure(QList<QPointF> &figure) const{
+    return (figure.size() > 1 && figure.first() == figure.back());
+}
+
+bool MyTranslator::isInside(QPointF &point, QList<QPointF> &figure){
+    int size = figure.size()-1, count=0;
+    float ax1,ax2,ay1,ay2,bx1,bx2,by1,by2,v1,v2,v3,v4;
+
+    bx1 = std::numeric_limits<float>::max();
+    by1 = point.y();
+    bx2 = point.x();
+    by2 = point.y();
+
+    for (int i = 0; i < size; i++){
+        ax1 = figure[i].x();
+        ay1 = figure[i].y();
+        ax2 = figure[i+1].x();
+        ay2 = figure[i+1].y();
+
+        v1=(bx2-bx1)*(ay1-by1)-(by2-by1)*(ax1-bx1);
+        v2=(bx2-bx1)*(ay2-by1)-(by2-by1)*(ax2-bx1);
+        v3=(ax2-ax1)*(by1-ay1)-(ay2-ay1)*(bx1-ax1);
+        v4=(ax2-ax1)*(by2-ay1)-(ay2-ay1)*(bx2-ax1);
+
+        if ((v1*v2<0) && (v3*v4<0)){
+            count++;
+        }
+    }
+
+    return (count%2==1);
+}
+
+int MyTranslator::getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figure){
+    int idx = 0, size = figure.size()-1;
+    float x1,x2,y1,y2,rx,ry,L,PR,cf,cur_dist,
+            min_dist =std::numeric_limits<float>::max(),
+            x = point.x(),
+            y = point.y();
+    bool res;
+
+    for (int i = 0; i < size; i++){
+        x1 = figure[i].x();
+        y1 = figure[i].y();
+        x2 = figure[(i+1)].x();
+        y2 = figure[(i+1)].y();
+
+        L=(x1-x2)*(x1-x2)+(y1-y2)*(y1-y2);
+        PR=(x-x1)*(x2-x1)+(y-y1)*(y2-y1);
+        cf=PR/L;
+        res = true;
+        if(cf<0){ cf=0; res=false; }
+        if(cf>1){ cf=1; res=false; }
+        rx=x1+cf*(x2-x1);
+        ry=y1+cf*(y2-y1);
+
+        if (res){
+            cur_dist = sqrt(pow(rx-x,2)+pow(ry-y,2));
+
+            if (cur_dist < min_dist){
+                min_dist = cur_dist;
+                idx = i+1;
+            }
+        }
+    }
+
+    return idx;
+}
+
+int MyTranslator::Intersection(QPointF &A,QPointF &B,  QList<QPointF> &figure, QPointF *p){
+    float v1,v2,v3,v4,a1,b1,c1,a2,b2,c2,x1,x2,x3,x4,y1,y2,y3,y4,div;
+    int size = figure.size()-1;
+
+    x1 = A.x();
+    y1 = A.y();
+    x2 = B.x();
+    y2 = B.y();
+
+    a1 = y2-y1;
+    b1 = x1-x2;
+    c1 = y1*x2-x1*y2;
+
+    for (int i = 0; i < size; i++){
+        x3 = figure[i].x();
+        y3 = figure[i].y();
+        x4 = figure[(i+1)%size].x();
+        y4 = figure[(i+1)%size].y();
+
+        a2 = y4-y3;
+        b2 = x3-x4;
+        c2 = y3*x4-x3*y4;
+
+        v1=(x4-x3)*(y1-y3)-a2*(x1-x3);
+        v2=(x4-x3)*(y2-y3)-a2*(x2-x3);
+        v3=(x2-x1)*(y3-y1)-a1*(x3-x1);
+        v4=(x2-x1)*(y4-y1)-a1*(x4-x1);
+
+        div = (a1 * b2 - a2 * b1);
+
+        if ((v1*v2<0) and (v3*v4<0)) {
+            if (p != nullptr){
+                *p = {(b1 * c2 - b2 * c1) / div, (a2 * c1 - a1 * c2) / div};
+            }
+
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int MyTranslator::getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure){
+    int size = figure.size()-1, idx = -1;
+    float min_dist = std::numeric_limits<float>::max(), cur_dist;
+    bool iff = isFilledFigure(figure);
+
+    for (int i = 0; i < size+((int)!iff); i++){
+        if (Intersection(figure[i],point,figure) != -1) continue;
+       if (Intersection(figure[(i+1)%size],point,figure) != -1) continue;
+
+        cur_dist = sqrt(pow(point.x()-figure[i].x(),2)+pow(point.y()-figure[i].y(),2)) + sqrt(pow(point.x()-figure[(i+1)%size].x(),2)+pow(point.y()-figure[(i+1)%size].y(),2));
+
+        if (cur_dist <= min_dist){
+            min_dist = cur_dist;
+            idx = i+1;
+        }
+    }
+
+    if (iff){
+        if (idx == 1) idx = size;
+    }else{
+        if (idx == 1) idx = 0;
+        else if (idx == -1) idx = size;
+    }
+
+    qDebug() << "   edge = " << idx;
+
+    return idx;
+}
+
 
 bool MyTranslator::rightPart(t_Variable &result){
     bool minus = false;
@@ -337,9 +492,17 @@ bool MyTranslator::rightPart(t_Variable &result){
                     QPointF tmp_vec = tmp.value.toPointF();
                     result.value.setValue(QPointF(result.value.toPointF().x() + tmp_vec.x(), result.value.toPointF().y() + tmp_vec.y()));
                 }else if (tmp.type == "figure"){
-                    QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
-                    tmp_fig << result.value.toPointF();
-                    result.value.setValue(tmp_fig);
+                    QList<QPointF> figure = tmp.value.value<QList<QPointF>>();
+                    QPointF point = result.value.toPointF();
+                    int idx = -1;
+
+                    idx = getIdxOfNearestEdge(point, figure);
+
+                    if (idx >= 0){
+                        figure.insert(idx,point);
+                    }
+
+                    result.value.setValue(figure);
                     result.type = "figure";
                 }else{
                     throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
@@ -377,14 +540,134 @@ bool MyTranslator::rightPart(t_Variable &result){
                     }
                     result.value.setValue(res_fig);
                 }else if (tmp.type == "point"){
-                    QList<QPointF> res_fig = result.value.value<QList<QPointF>>();
-                    res_fig << tmp.value.toPointF();
-                    result.value.setValue(res_fig);
+                    QList<QPointF> figure = result.value.value<QList<QPointF>>();
+                    QPointF point = tmp.value.toPointF();
+                    int idx = -1;
+
+                    idx = getIdxOfNearestEdge(point, figure);
+
+                    if (idx >= 0){
+                        figure.insert(idx,point);
+                    }
+
+                    result.value.setValue(figure);
                 }else if (tmp.type == "figure"){
-                    QList<QPointF> res_fig = result.value.value<QList<QPointF>>();
-                    QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
-                    res_fig << tmp_fig;
-                    result.value.setValue(res_fig);
+                    QList<QPointF> fig1 = result.value.value<QList<QPointF>>();
+                    QList<QPointF> fig2 = tmp.value.value<QList<QPointF>>();
+
+                    int i, j,startPointIdx = -1,startPointIdx2 = -1, move;
+                    short step = 1;
+
+                    int size1 = fig1.size()-1,
+                            size2 = fig2.size()-1;
+
+                    qDebug() << ".\n.\n____INTEGRATION____\n  { s1=" << size1 << "; s2="<<size2<<"}";
+
+                    for (i = 0;i < size1; i++){
+                        if (!isInside(fig1[i],fig2)){
+                            startPointIdx = i;
+                            break;
+                        }
+                    }
+
+                    if (startPointIdx >= 0 && startPointIdx < size1){
+                        qDebug() << "   [фигуры пересекаются, начало в "<<startPointIdx<<"]";
+
+                        QList<QPointF> new_fig = {fig1[startPointIdx]};
+                        QPointF transition;
+
+                        qDebug() << "   init new fig: \n        ["<<new_fig.size()<<"]" << new_fig;
+
+                        bool next = true;
+
+                        for (i = startPointIdx; i != startPointIdx || next; i = (i+1)%size1){
+                            next = false;
+
+                            startPointIdx2 = Intersection(fig1[i],fig1[(i+1)%size1],fig2,&transition);
+
+                            if (startPointIdx2 == -1){
+                                new_fig.append(fig1[(i+1)%size1]);
+                            }else{
+                                qDebug() << "           [пересечение в ("<<transition.x()<<","<<transition.y()<<"] " << startPointIdx2;
+
+                                new_fig.append(transition);
+                                qDebug() << "           ["<<new_fig.size()<<"]" << new_fig;
+
+                                if (isInside(fig2[startPointIdx2],fig1)){
+                                    int min_moves = 9999;
+                                    move = 1;
+
+                                    qDebug() << "           [выбираем направление обхода]";
+
+                                    for (j = startPointIdx2+1; j != startPointIdx2; j=(j+1)%size2){
+                                        qDebug() << "               >";
+
+                                        if (isInside(fig2[j],fig1)){
+                                            move++;
+                                        }else{
+                                            min_moves = move;
+                                            qDebug() << "               > " << move;
+                                            break;
+                                        }
+                                    }
+
+                                    move = 1;
+
+                                    for (j = startPointIdx2-1; j != startPointIdx2; j--){
+                                        if (j < 0) j = size2-1;
+
+                                        qDebug() << "               <";
+
+                                        if (isInside(fig2[j],fig1)){
+                                            move++;
+                                        }else{
+                                            if (min_moves > move) {
+                                                step = -1;
+                                                new_fig.append(fig2[j]);
+                                                move = -move;
+                                                qDebug() << "               < " << move;
+                                            }
+                                            break;
+                                        }
+                                    }
+
+                                    if (step > 0){
+                                        new_fig.append(fig2[(startPointIdx2 + move)%size2]);
+                                        qDebug() << "               [движение >]";
+                                    }else{
+                                        qDebug() << "               [движение <]";
+                                    }
+
+                                }else{
+                                    move = 0;
+                                }
+
+                                for (j = startPointIdx2 + move; ; j+=step){
+                                    if (step>0) j%=size2;
+                                    else if (j < 0) j = size2-1;
+
+                                    i = Intersection(fig2[j],fig2[(j+1)%size2],fig1,&transition);
+
+                                    if (i >= 0){
+                                        new_fig.append(transition);
+                                        qDebug() << "               ["<<new_fig.size()<<"]" << new_fig;
+                                        qDebug() << "           [пересечение в "<<i<<"]";
+                                        break;
+                                    }else{
+                                        new_fig.append(fig2[j+1]);
+                                        qDebug() << "               ["<<new_fig.size()<<"]" << new_fig;
+                                    }
+                                }
+
+                                new_fig.append(fig1[(i+1)%size1]);
+                            }
+                        }
+
+                        new_fig.append(fig1[startPointIdx]);
+                        result.value.setValue(new_fig);
+                    }else{
+
+                    }
                 }else{
                     throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
                     return false;
@@ -449,11 +732,17 @@ bool MyTranslator::rightPart(t_Variable &result){
                     }
                     result.value.setValue(res_fig);
                 }else if (tmp.type == "point"){
-                    QList<QPointF> res_fig = result.value.value<QList<QPointF>>();
-                    QPointF tmp_point = tmp.value.toPointF();
+                    QList<QPointF> figure = result.value.value<QList<QPointF>>();
+                    QPointF point = tmp.value.toPointF();
 
-                    res_fig.removeOne(tmp_point);
-                    result.value.setValue(res_fig);
+                    if (isFilledFigure(figure)){
+                        if (isInside(point,figure)){
+                            int idx = getIdxOfMinPerpendicular(point,figure);
+
+                            figure.insert(idx,point);
+                            result.value.setValue(figure);
+                        }
+                    }
                 }else if (tmp.type == "figure"){
                     QList<QPointF> res_fig = result.value.value<QList<QPointF>>();
                     QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
@@ -579,14 +868,14 @@ bool MyTranslator::block(t_Variable &result){
 
             if (result.type == "float"){
                 if (tmp.type == "float"){
-                    int num = tmp.value.toFloat();
+                    float num = tmp.value.toFloat();
                     if (num == 0){
                         throwError("нельзя делить на 0");
                         return false;
                     }
                     result.value.setValue(result.value.toFloat()/num);
                 }else if (tmp.type == "vector"){
-                    int num = result.value.toFloat();
+                    float num = result.value.toFloat();
                     QPointF tmp_vec = tmp.value.toPointF();
 
                     if (tmp_vec.x() == 0 || tmp_vec.y() == 0){
@@ -597,7 +886,7 @@ bool MyTranslator::block(t_Variable &result){
                     result.value.setValue(QPointF(num / tmp_vec.x(), num / tmp_vec.y()));
                     result.type = "vector";
                 }else if (tmp.type == "point"){
-                    int num = result.value.toFloat();
+                    float num = result.value.toFloat();
                     QPointF tmp_point = tmp.value.toPointF();
 
                     if (tmp_point.x() == 0 || tmp_point.y() == 0){
@@ -609,7 +898,7 @@ bool MyTranslator::block(t_Variable &result){
                     result.type = "point";
                 }else if (tmp.type == "figure"){
                     QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
-                    int num = result.value.toFloat();
+                    float num = result.value.toFloat();
                     for (auto &p : tmp_fig){
                         if (p.x() == 0 || p.y() == 0){
                             throwError("нельзя делить на 0");
@@ -624,7 +913,7 @@ bool MyTranslator::block(t_Variable &result){
                 }
             }else if (result.type == "vector"){
                 if (tmp.type == "float"){
-                    int num = tmp.value.toFloat();
+                    float num = tmp.value.toFloat();
 
                     if (num == 0){
                         throwError("нельзя делить на 0");
@@ -670,7 +959,7 @@ bool MyTranslator::block(t_Variable &result){
                 }
             }else if (result.type == "point"){
                 if (tmp.type == "float"){
-                    int num = tmp.value.toFloat();
+                    float num = tmp.value.toFloat();
 
                     if (num == 0){
                         throwError("нельзя делить на 0");
@@ -696,7 +985,7 @@ bool MyTranslator::block(t_Variable &result){
             }else if (result.type == "figure"){
                 if (tmp.type == "float"){
                     QList<QPointF> res_fig = result.value.value<QList<QPointF>>();
-                    int num = tmp.value.toFloat();
+                    float num = tmp.value.toFloat();
 
                     if (num == 0){
                         throwError("нельзя делить на 0");
@@ -861,7 +1150,7 @@ bool MyTranslator::getVector(t_Variable &result){
 bool MyTranslator::part(t_Variable &result){
     if (is("(")){
         if (!next()){
-            throwError("после '(' должно быть число");
+            throwError("после '(' должно быть выражение");
             return false;
         }
 
@@ -899,7 +1188,7 @@ bool MyTranslator::part(t_Variable &result){
                  return false;
              }
         }else{
-            result.value.setValue(tmp);
+            result.value.setValue(tmp.value);
             result.type = tmp.type;
         }
 

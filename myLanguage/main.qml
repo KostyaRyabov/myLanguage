@@ -7,13 +7,18 @@ import Translator 1.0
 Window {
     id: window
     width: 1000
+    minimumWidth: 900
     height: 500
+    minimumHeight: 400
     visible: true
     title: qsTr("Vecto..")
+    visibility: ApplicationWindow.Maximized
 
     Canvas{
         id: drawingCanvas
-        anchors.fill: parent
+        anchors.left: codeArea.right
+        width: window.width - codeArea.width
+        height: window.height
 
         onPaint: {
             var ctx = getContext("2d");
@@ -58,9 +63,9 @@ Window {
 
     Rectangle{
         id:codeArea
-        width: 300;
+        width: 600;
         height: parent.height
-        anchors.right: parent.right
+        anchors.left: parent.left
 
         color: "#BADBDE"
 
@@ -95,6 +100,11 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
+                text: "figure s1 = {(100,100),(200,100),(200,200),(100,200),(100,100)};
+figure s2 = s1 + [50,50];
+figure s = s1 + s2;
+draw (s);"
+
                 placeholderText: qsTr("Введите команду...")
 
                 onTextChanged: {
@@ -107,30 +117,29 @@ Window {
                 selectByMouse: true
             }
         }
-    }
 
-    Rectangle{
-        id:errorRect
+        Rectangle{
+            id:errorRect
 
-        property rect p: [0,0,0,0]
+            property rect p: 0,0,0,0
 
-        x: p.x + codeArea.x + textInput.x
-        y: p.y + codeArea.y + textInput.y - flic.contentY
-        width: codeArea.x - p.x - 10
-        height: p.height
+            x: p.x + textInput.x
+            y: p.y + textInput.y - flic.contentY
+            width: codeArea.width - p.x - 10
+            height: p.height
 
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
 
-            GradientStop { position: 0.0; color: "transparent" }
-            GradientStop { position: 0.01; color: "red" }
-            GradientStop { position: 0.8; color: "transparent" }
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.01; color: "red" }
+                GradientStop { position: 0.8; color: "transparent" }
+            }
+
+            Behavior on width{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
+            Behavior on x{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
+            Behavior on opacity{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 1000 } }
         }
-
-        Behavior on width{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
-        Behavior on x{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
-        //Behavior on y{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
-        Behavior on opacity{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 1000 } }
     }
 
     Rectangle{
