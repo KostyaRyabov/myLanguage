@@ -7,13 +7,30 @@
 #include <QTextDocumentFragment>
 #include <math.h>
 #include <limits>
+#include <QHash>
+
+const double EPS = 0.01;
+
+inline bool between (float a,float b, float c) {
+    return std::min(a,b) <= c + EPS && c <= std::max(a,b) + EPS;
+}
 
 struct t_Variable{
     QString type;
     QVariant value;
 };
 
+struct RowData{
+    uint32_t A_idx;
+    uint32_t B_idx;
+    bool visited = false;
+};
+
 Q_DECLARE_METATYPE(t_Variable)
+
+inline uint qHash(const QPointF &p) {
+    return qHash(QPair<qreal, qreal> (p.x(), p.y()));
+}
 
 class MyTranslator: public QObject
 {
@@ -65,7 +82,8 @@ private:
     QPointF getCenter(QList<QPointF> &figure);
     bool isFilledFigure(QList<QPointF> &figure) const;
     bool isInside(QPointF &point, QList<QPointF> &figure);
-    int Intersection(QPointF &a1,QPointF &a2, QList<QPointF> &figure, QPointF *p = nullptr);
+    int Intersection(QPointF &a1,QPointF &a2, QList<QPointF> &figure);
+    QList<QPointF>  IntersectionList(QList<QPointF> &A, QList<QPointF> &B);
     int getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figure);
     int getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure);
 signals:

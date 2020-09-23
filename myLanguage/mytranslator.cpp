@@ -308,9 +308,9 @@ bool MyTranslator::isFilledFigure(QList<QPointF> &figure) const{
 
 bool MyTranslator::isInside(QPointF &point, QList<QPointF> &figure){
     int size = figure.size()-1, count=0;
-    float ax1,ax2,ay1,ay2,bx1,bx2,by1,by2,v1,v2,v3,v4;
+    float ax1,ax2,bx1,bx2,ay1,ay2,by1,by2,v1,v2,v3,v4;
 
-    bx1 = std::numeric_limits<float>::max();
+    bx1 = 2000;
     by1 = point.y();
     bx2 = point.x();
     by2 = point.y();
@@ -321,14 +321,17 @@ bool MyTranslator::isInside(QPointF &point, QList<QPointF> &figure){
         ax2 = figure[i+1].x();
         ay2 = figure[i+1].y();
 
+        if (std::abs(ay1 - by1) <= EPS) {
+            count++;
+            continue;
+        }
+
         v1=(bx2-bx1)*(ay1-by1)-(by2-by1)*(ax1-bx1);
         v2=(bx2-bx1)*(ay2-by1)-(by2-by1)*(ax2-bx1);
         v3=(ax2-ax1)*(by1-ay1)-(ay2-ay1)*(bx1-ax1);
         v4=(ax2-ax1)*(by2-ay1)-(ay2-ay1)*(bx2-ax1);
 
-        if ((v1*v2<0) && (v3*v4<0)){
-            count++;
-        }
+        if ((v1*v2<0) && (v3*v4<0)) count++;
     }
 
     return (count%2==1);
@@ -340,7 +343,6 @@ int MyTranslator::getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figur
             min_dist =std::numeric_limits<float>::max(),
             x = point.x(),
             y = point.y();
-    bool res;
 
     for (int i = 0; i < size; i++){
         x1 = figure[i].x();
@@ -351,13 +353,11 @@ int MyTranslator::getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figur
         L=(x1-x2)*(x1-x2)+(y1-y2)*(y1-y2);
         PR=(x-x1)*(x2-x1)+(y-y1)*(y2-y1);
         cf=PR/L;
-        res = true;
-        if(cf<0){ cf=0; res=false; }
-        if(cf>1){ cf=1; res=false; }
-        rx=x1+cf*(x2-x1);
-        ry=y1+cf*(y2-y1);
 
-        if (res){
+        if (0 <= cf && cf <= 1){
+            rx=x1+cf*(x2-x1);
+            ry=y1+cf*(y2-y1);
+
             cur_dist = sqrt(pow(rx-x,2)+pow(ry-y,2));
 
             if (cur_dist < min_dist){
@@ -370,8 +370,58 @@ int MyTranslator::getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figur
     return idx;
 }
 
-int MyTranslator::Intersection(QPointF &A,QPointF &B,  QList<QPointF> &figure, QPointF *p){
-    float v1,v2,v3,v4,a1,b1,c1,a2,b2,c2,x1,x2,x3,x4,y1,y2,y3,y4,div;
+
+QList<QPointF> MyTranslator::IntersectionList(QList<QPointF> &A, QList<QPointF> &B){
+    float a1,b1,c1,a2,b2,c2,x1,x2,x3,x4,y1,y2,y3,y4,div;
+    uint32_t size_A = A.size()-1,
+            size_B = B.size()-1;
+
+    QList<QPointF> list;
+
+    for (uint32_t i = 0; i < size_A; i++){
+        x1 = A[i].x();
+        y1 = A[i].y();
+        x2 = A[i+1].x();
+        y2 = A[i+1].y();
+
+        a1 = y2-y1;
+        b1 = x1-x2;
+        c1 = y1*x2-x1*y2;
+
+        for (uint32_t j = 0; j < size_B; j++){
+            if ((std::abs(A[i].x() - B[j].x()) <=EPS) && (std::abs(A[i].y() - B[j].y()) <=EPS) &&  !list.contains(A[i])){
+                list.append(B[j]);
+                qDebug() << "[1]";
+                continue;
+            }
+
+            x3 = B[j].x();
+            y3 = B[j].y();
+            x4 = B[j+1].x();
+            y4 = B[j+1].y();
+
+            a2 = y4-y3;
+            b2 = x3-x4;
+            c2 = y3*x4-x3*y4;
+
+            div = (a1 * b2 - a2 * b1);
+
+            if (std::abs(div) >= EPS){
+                float x = (b1 * c2 - b2 * c1) / div;
+                float y = (a2 * c1 - a1 * c2) / div;
+
+                if (between(x1,x2,x) && between(y1,y2,y) && between(x3,x4,x) && between(y3,y4,y)){
+                    if (!list.contains({x,y})) list.append({x,y});
+                }
+            }
+        }
+    }
+
+    return list;
+}
+
+int MyTranslator::Intersection(QPointF &A,QPointF &B,  QList<QPointF> &figure){
+    float v1,v2,v3,v4,x1,x2,x3,x4,y1,y2,y3,y4;
     int size = figure.size()-1;
 
     x1 = A.x();
@@ -379,32 +429,18 @@ int MyTranslator::Intersection(QPointF &A,QPointF &B,  QList<QPointF> &figure, Q
     x2 = B.x();
     y2 = B.y();
 
-    a1 = y2-y1;
-    b1 = x1-x2;
-    c1 = y1*x2-x1*y2;
-
     for (int i = 0; i < size; i++){
         x3 = figure[i].x();
         y3 = figure[i].y();
         x4 = figure[(i+1)%size].x();
         y4 = figure[(i+1)%size].y();
 
-        a2 = y4-y3;
-        b2 = x3-x4;
-        c2 = y3*x4-x3*y4;
+        v1=(x4-x3)*(y1-y3)-(y4-y3)*(x1-x3);
+        v2=(x4-x3)*(y2-y3)-(y4-y3)*(x2-x3);
+        v3=(x2-x1)*(y3-y1)-(y2-y1)*(x3-x1);
+        v4=(x2-x1)*(y4-y1)-(y2-y1)*(x4-x1);
 
-        v1=(x4-x3)*(y1-y3)-a2*(x1-x3);
-        v2=(x4-x3)*(y2-y3)-a2*(x2-x3);
-        v3=(x2-x1)*(y3-y1)-a1*(x3-x1);
-        v4=(x2-x1)*(y4-y1)-a1*(x4-x1);
-
-        div = (a1 * b2 - a2 * b1);
-
-        if ((v1*v2<0) and (v3*v4<0)) {
-            if (p != nullptr){
-                *p = {(b1 * c2 - b2 * c1) / div, (a2 * c1 - a1 * c2) / div};
-            }
-
+        if ((v1*v2<=0) and (v3*v4<=0)) {
             return i;
         }
     }
@@ -418,8 +454,8 @@ int MyTranslator::getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure){
     bool iff = isFilledFigure(figure);
 
     for (int i = 0; i < size+((int)!iff); i++){
-        if (Intersection(figure[i],point,figure) != -1) continue;
-       if (Intersection(figure[(i+1)%size],point,figure) != -1) continue;
+        if (Intersection(figure[i],point,figure) == -1) continue;
+       if (Intersection(figure[(i+1)%size],point,figure) == -1) continue;
 
         cur_dist = sqrt(pow(point.x()-figure[i].x(),2)+pow(point.y()-figure[i].y(),2)) + sqrt(pow(point.x()-figure[(i+1)%size].x(),2)+pow(point.y()-figure[(i+1)%size].y(),2));
 
@@ -552,122 +588,124 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     result.value.setValue(figure);
                 }else if (tmp.type == "figure"){
-                    QList<QPointF> fig1 = result.value.value<QList<QPointF>>();
-                    QList<QPointF> fig2 = tmp.value.value<QList<QPointF>>();
 
-                    int i, j,startPointIdx = -1,startPointIdx2 = -1, move;
-                    short step = 1;
+                    //================================================
 
-                    int size1 = fig1.size()-1,
-                            size2 = fig2.size()-1;
 
-                    qDebug() << ".\n.\n____INTEGRATION____\n  { s1=" << size1 << "; s2="<<size2<<"}";
 
-                    for (i = 0;i < size1; i++){
-                        if (!isInside(fig1[i],fig2)){
-                            startPointIdx = i;
-                            break;
-                        }
+
+
+
+
+
+
+
+
+
+                    QList<QPointF> res,
+                            A = tmp.value.value<QList<QPointF>>(),
+                            B = result.value.value<QList<QPointF>>();
+
+
+                    // проверка что это закрашенная фигура ? - для того, чтобы понять стоит ли идти по кругу
+
+
+                    // (1) добавляем точки пересечения
+
+                    QList<QPointF> list = IntersectionList(A,B);
+                    QHash<QPointF, RowData> table;
+
+                    qDebug() << "list :" <<  list;
+
+                    uint32_t A_idx = 0, B_idx;
+
+                    for (auto &p : list){
+                        A_idx = getIdxOfMinPerpendicular(p, A);
+                        if (A[A_idx] != p) A.insert(A_idx,p);
+
+                        B_idx = getIdxOfMinPerpendicular(p, B);
+                        if (B[B_idx] != p) B.insert(B_idx ,p);
                     }
 
-                    if (startPointIdx >= 0 && startPointIdx < size1){
-                        qDebug() << "   [фигуры пересекаются, начало в "<<startPointIdx<<"]";
+                    int
+                            A_size = A.size()-1,
+                            B_size = B.size()-1;
 
-                        QList<QPointF> new_fig = {fig1[startPointIdx]};
-                        QPointF transition;
+                    for (int i = 0;i < A_size;i++) if (list.contains(A[i])) table[A[i]].A_idx = i;
+                    for (int i = 0;i < B_size;i++) if (list.contains(B[i])) table[B[i]].B_idx = i;
 
-                        qDebug() << "   init new fig: \n        ["<<new_fig.size()<<"]" << new_fig;
+                    if (list.size() > 0){
+                        RowData pc;
 
-                        bool next = true;
+                        int startPos = -1;
 
-                        for (i = startPointIdx; i != startPointIdx || next; i = (i+1)%size1){
-                            next = false;
-
-                            startPointIdx2 = Intersection(fig1[i],fig1[(i+1)%size1],fig2,&transition);
-
-                            if (startPointIdx2 == -1){
-                                new_fig.append(fig1[(i+1)%size1]);
-                            }else{
-                                qDebug() << "           [пересечение в ("<<transition.x()<<","<<transition.y()<<"] " << startPointIdx2;
-
-                                new_fig.append(transition);
-                                qDebug() << "           ["<<new_fig.size()<<"]" << new_fig;
-
-                                if (isInside(fig2[startPointIdx2],fig1)){
-                                    int min_moves = 9999;
-                                    move = 1;
-
-                                    qDebug() << "           [выбираем направление обхода]";
-
-                                    for (j = startPointIdx2+1; j != startPointIdx2; j=(j+1)%size2){
-                                        qDebug() << "               >";
-
-                                        if (isInside(fig2[j],fig1)){
-                                            move++;
-                                        }else{
-                                            min_moves = move;
-                                            qDebug() << "               > " << move;
-                                            break;
-                                        }
-                                    }
-
-                                    move = 1;
-
-                                    for (j = startPointIdx2-1; j != startPointIdx2; j--){
-                                        if (j < 0) j = size2-1;
-
-                                        qDebug() << "               <";
-
-                                        if (isInside(fig2[j],fig1)){
-                                            move++;
-                                        }else{
-                                            if (min_moves > move) {
-                                                step = -1;
-                                                new_fig.append(fig2[j]);
-                                                move = -move;
-                                                qDebug() << "               < " << move;
-                                            }
-                                            break;
-                                        }
-                                    }
-
-                                    if (step > 0){
-                                        new_fig.append(fig2[(startPointIdx2 + move)%size2]);
-                                        qDebug() << "               [движение >]";
-                                    }else{
-                                        qDebug() << "               [движение <]";
-                                    }
-
-                                }else{
-                                    move = 0;
-                                }
-
-                                for (j = startPointIdx2 + move; ; j+=step){
-                                    if (step>0) j%=size2;
-                                    else if (j < 0) j = size2-1;
-
-                                    i = Intersection(fig2[j],fig2[(j+1)%size2],fig1,&transition);
-
-                                    if (i >= 0){
-                                        new_fig.append(transition);
-                                        qDebug() << "               ["<<new_fig.size()<<"]" << new_fig;
-                                        qDebug() << "           [пересечение в "<<i<<"]";
-                                        break;
-                                    }else{
-                                        new_fig.append(fig2[j+1]);
-                                        qDebug() << "               ["<<new_fig.size()<<"]" << new_fig;
-                                    }
-                                }
-
-                                new_fig.append(fig1[(i+1)%size1]);
+                        for (int i = 0; i < A_size; i++) {
+                            if (!isInside(A[i],B) || !table.contains(A[i])) {
+                                startPos = i;
+                                res<<A[i];
+                                break;
                             }
                         }
 
-                        new_fig.append(fig1[startPointIdx]);
-                        result.value.setValue(new_fig);
-                    }else{
+                        qDebug() << startPos;
 
+                        for (int i = startPos+1;; i++) {
+                            if (i >= A_size) i = 0;
+
+                            if (i == startPos) break;
+
+                            res << A[i];
+
+                            if (list.contains(A[i])){
+                                if (table[A[i]].visited){
+                                    break;
+                                }else{
+                                    table[A[i]].visited = true;
+
+                                    pc = table[A[i]];
+
+                                    qDebug() << "\t" << isInside(B[pc.B_idx + 1],A) << list.contains(B[pc.B_idx + 1]) << B[pc.B_idx + 1];
+
+                                    if (isInside(B[pc.B_idx + 1],A) || list.contains(B[pc.B_idx + 1])){
+                                        for (int j = pc.B_idx-1;;j--) {
+                                            if (j == 0) j = B_size-1;
+
+                                            res << B[j];
+
+                                            if (list.contains(B[j])){
+                                                qDebug() << "\t=====1=====" << B[j];
+                                                table[B[j]].visited = true;
+                                                i = table[B[j]].A_idx;
+                                                break;
+                                            }
+                                        }
+                                    }else{
+                                        for (int j = pc.B_idx+1;; j++) {
+                                            if (j >= B_size) j = 0;
+
+                                            res << B[j];
+
+                                            if (table.contains(B[j])){
+                                                qDebug() << "\t=====2=====" << B[j];
+                                                table[B[j]].visited = true;
+                                                i = table[B[j]].A_idx;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }else{
+                        res << A << B;
                     }
+
+                    res << res[0];
+                    qDebug() << res;
+                    result.value.setValue(res);
+
+                    //================================================
+
                 }else{
                     throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
                     return false;

@@ -100,11 +100,15 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "figure s1 = {(100,100),(200,100),(200,200),(100,200),(100,100)};
-figure s2 = s1 + [50,50];
-figure s = s1 + s2;
-draw (s);"
+                text: "figure s1 = {(100,100),(200,100),(200,200),(250,250),(100,200),(100,100)};
+figure s2 = {(250,200),(300,200),(300,400),(150,400),(150,300),(250,200)}-[0,50.];
+rotate (s2,4);
+draw (s1+s2);"
 
+                /*
+                    figure s = s1 + s2;
+                    draw (s1,s2);
+                */
                 placeholderText: qsTr("Введите команду...")
 
                 onTextChanged: {
