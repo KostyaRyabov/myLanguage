@@ -824,26 +824,28 @@ bool MyTranslator::block(t_Variable &result){
                 if (tmp.type == "float"){
                     result.value.setValue(result.value.toFloat()*tmp.value.toFloat());
                 }else if (tmp.type == "vector"){
-                    int num = result.value.toFloat();
+                    float num = result.value.toFloat();
                     result.value.setValue(QPointF(tmp.value.toPointF().x()*num, tmp.value.toPointF().y()*num));
                     result.type = "vector";
                 }else if (tmp.type == "point"){
-                    int num = result.value.toFloat();
+                    float num = result.value.toFloat();
                     result.value.setValue(QPointF(tmp.value.toPointF().x()*num, tmp.value.toPointF().y()*num));
                     result.type = "point";
                 }else if (tmp.type == "figure"){
                     QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
-                    int num = result.value.toFloat();
+                    float num = result.value.toFloat();
+                    auto o = getCenter(tmp_fig);
+
                     for (auto &p : tmp_fig){
-                        p.setX(num * p.x());
-                        p.setY(num * p.y());
+                        p.setX(num * (p.x()-o.x())+o.x());
+                        p.setY(num * (p.y()-o.y())+o.y());
                     }
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
                 }
             }else if (result.type == "vector"){
                 if (tmp.type == "float"){
-                    int num = tmp.value.toFloat();
+                    float num = tmp.value.toFloat();
                     QPointF res_vec = result.value.toPointF();
                     result.value.setValue(QPointF(res_vec.x()*num, res_vec.y()*num));
                 }else if (tmp.type == "vector"){
@@ -858,16 +860,19 @@ bool MyTranslator::block(t_Variable &result){
                 }else if (tmp.type == "figure"){
                     QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
                     QPointF res_vec = result.value.toPointF();
+                    auto o = getCenter(tmp_fig);
+
                     for (auto &p : tmp_fig){
-                        p.setX(res_vec.x() * p.x());
-                        p.setY(res_vec.y() * p.y());
+                        p.setX(res_vec.x() * (p.x()-o.x())+o.x());
+                        p.setY(res_vec.x() * (p.y()-o.y())+o.y());
                     }
+
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
                 }
             }else if (result.type == "point"){
                 if (tmp.type == "float"){
-                    int num = tmp.value.toFloat();
+                    float num = tmp.value.toFloat();
                     QPointF res_point = result.value.value<QPointF>();
                     result.value.setValue(QPointF(res_point.x()*num, res_point.y()*num));
                 }else if (tmp.type == "vector"){
@@ -881,10 +886,12 @@ bool MyTranslator::block(t_Variable &result){
             }else if (result.type == "figure"){
                 if (tmp.type == "float"){
                     QList<QPointF> res_fig = result.value.value<QList<QPointF>>();
-                    int num = tmp.value.toFloat();
+                    float num = tmp.value.toFloat();
+                    auto o = getCenter(res_fig);
+
                     for (auto &p : res_fig){
-                        p.setX(p.x() * num);
-                        p.setY(p.y() * num);
+                        p.setX(num * (p.x()-o.x())+o.x());
+                        p.setY(num * (p.y()-o.y())+o.y());
                     }
                     result.value.setValue(res_fig);
                 }else if (tmp.type == "vector"){
@@ -934,20 +941,9 @@ bool MyTranslator::block(t_Variable &result){
 
                     result.value.setValue(QPointF(num / tmp_point.x(), num / tmp_point.y()));
                     result.type = "point";
-                }else if (tmp.type == "figure"){
-                    QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
-                    float num = result.value.toFloat();
-                    for (auto &p : tmp_fig){
-                        if (p.x() == 0 || p.y() == 0){
-                            throwError("нельзя делить на 0");
-                            return false;
-                        }
-
-                        p.setX(num / p.x());
-                        p.setY(num / p.y());
-                    }
-                    result.value.setValue(tmp_fig);
-                    result.type = "figure";
+                }else{
+                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'");
+                    return false;
                 }
             }else if (result.type == "vector"){
                 if (tmp.type == "float"){
@@ -970,30 +966,9 @@ bool MyTranslator::block(t_Variable &result){
 
                     QPointF res_vec = result.value.toPointF();
                     result.value.setValue(QPointF(res_vec.x() / tmp_vec.x(), res_vec.y() / tmp_vec.y()));
-                }else if (tmp.type == "point"){
-                    QPointF tmp_vec = tmp.value.toPointF();
-
-                    if (tmp_vec.x() == 0 || tmp_vec.y() == 0){
-                        throwError("нельзя делить на 0");
-                        return false;
-                    }
-
-                    QPointF res_vec = result.value.toPointF();
-                    result.value.setValue(QPointF(res_vec.x() / tmp_vec.x(), res_vec.y() / tmp_vec.y()));
-                    result.type = "point";
-                }else if (tmp.type == "figure"){
-                    QList<QPointF> tmp_fig = tmp.value.value<QList<QPointF>>();
-                    QPointF res_vec = result.value.toPointF();
-                    for (auto &p : tmp_fig){
-                        if (p.x() == 0 || p.y() == 0){
-                            throwError("нельзя делить на 0");
-                            return false;
-                        }
-                        p.setX(res_vec.x() / p.x());
-                        p.setY(res_vec.y() / p.y());
-                    }
-                    result.value.setValue(tmp_fig);
-                    result.type = "figure";
+                }else{
+                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'");
+                    return false;
                 }
             }else if (result.type == "point"){
                 if (tmp.type == "float"){
@@ -1030,9 +1005,10 @@ bool MyTranslator::block(t_Variable &result){
                         return false;
                     }
 
+                    auto o = getCenter(res_fig);
                     for (auto &p : res_fig){
-                        p.setX(p.x() / num);
-                        p.setY(p.y() / num);
+                        p.setX((p.x()-o.x())/num+o.x());
+                        p.setY((p.y()-o.y())/num+o.y());
                     }
                     result.value.setValue(res_fig);
                 }else if (tmp.type == "vector"){
@@ -1044,9 +1020,10 @@ bool MyTranslator::block(t_Variable &result){
                         return false;
                     }
 
+                    auto o = getCenter(res_fig);
                     for (auto &p : res_fig){
-                        p.setX(p.x() / tmp_vec.x());
-                        p.setY(p.y() / tmp_vec.y());
+                        p.setX((p.x()-o.x())/tmp_vec.x()+o.x());
+                        p.setY((p.y()-o.y())/tmp_vec.y()+o.y());
                     }
                     result.value.setValue(res_fig);
                 }else{
