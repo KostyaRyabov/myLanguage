@@ -30,6 +30,8 @@ Window {
             ctx.strokeStyle = "black"
 
             for (let f = 0; f < translator.amountOfFigures(); f++){
+                ctx.beginPath();
+
                 drawingCanvas.list = translator.getHidenEdges(f);
 
                 if (translator.amountOfPointsOnFigure(f) > 0){
@@ -39,15 +41,22 @@ Window {
                     if (translator.amountOfPointsOnFigure(f) > 1){
                         ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
                         for (; p < translator.amountOfPointsOnFigure(f); p++){
-                            if (drawingCanvas.list.includes(p)) ctx.moveTo(translator.getX(f,p), translator.getY(f,p))
-                            else ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
+                            if (drawingCanvas.list.includes(p)) {
+                                if (p > 0) {
+                                    console.log("e:",p)
+                                    ctx.closePath();
+                                }
+                                ctx.moveTo(translator.getX(f,p), translator.getY(f,p))
+                            }else{
+                                ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
+                            }
                         }
 
                         p--;
 
                         if (translator.getX(f,p) === translator.getX(f,0) && translator.getY(f,p) === translator.getY(f,0)){
                             ctx.fillStyle = "rgba(255, 136, 26, 0.4)";
-                            ctx.fill();
+                            ctx.fill('evenodd');
                         }
 
                         ctx.stroke()
@@ -107,7 +116,7 @@ Window {
 
                 text: "figure s1 = {(100,100),(300,100),(300,300),(250,150),(150,150),(100,300),(100,100)};
 figure s2 = {(50,200),(350,200),(350,250),(50,250),(50,200)}*[1,1]+[0,-20];
-draw (s2+s1);"
+draw (s1-s2);"
 
                 /*
                     figure s = s1 + s2;
