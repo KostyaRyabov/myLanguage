@@ -20,6 +20,8 @@ Window {
         width: window.width - codeArea.width
         height: window.height
 
+        property variant list;
+
         onPaint: {
             var ctx = getContext("2d");
             ctx.reset()
@@ -28,6 +30,8 @@ Window {
             ctx.strokeStyle = "black"
 
             for (let f = 0; f < translator.amountOfFigures(); f++){
+                drawingCanvas.list = translator.getHidenEdges(f);
+
                 if (translator.amountOfPointsOnFigure(f) > 0){
 
                     var p = 1;
@@ -35,7 +39,8 @@ Window {
                     if (translator.amountOfPointsOnFigure(f) > 1){
                         ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
                         for (; p < translator.amountOfPointsOnFigure(f); p++){
-                            ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
+                            if (drawingCanvas.list.includes(p)) ctx.moveTo(translator.getX(f,p), translator.getY(f,p))
+                            else ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
                         }
 
                         p--;
@@ -100,10 +105,14 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "figure s1 = {(100,100),(200,100),(200,200),(250,250),(100,200),(100,100)};
-figure s2 = {(250,200),(300,200),(300,400),(150,400),(150,300),(250,200)}-[0,50.];
-rotate (s2,4);
-draw (s1+s2);"
+                text: "figure s1 = {(100,100),(300,100),(300,300),(250,150),(150,150),(100,300),(100,100)};
+figure s2 = {(50,200),(350,200),(350,250),(50,250),(50,200)}*[1.5,0.1]+[40,70];
+rotate(s2,90);
+figure s3 = s1+[30,340];
+rotate (s3,180);
+figure s = s1+s3+[100,0];
+rotate (s,19);
+draw (s);"
 
                 /*
                     figure s = s1 + s2;
