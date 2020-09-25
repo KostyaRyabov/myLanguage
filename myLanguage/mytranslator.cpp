@@ -665,67 +665,139 @@ bool MyTranslator::rightPart(t_Variable &result){
                         int startPos = -1;
 
                         for (int i = 0; i < A_size; i++) {
-                            if (!isInside(A[i],B) || !table.contains(A[i])) {
+                            if (!isInside(A[i],B) && !table.contains(A[i])) {
                                 startPos = i;
                                 res<<A[i];
                                 break;
                             }
                         }
 
-                        qDebug() << "startPost = " << startPos;
+                        QPointF v;
 
-                        for (int i = startPos+1;; i++) {
-                            if (i >= A_size) i = 0;
+                        do{
+                            v = normalizedVector({A[startPos + 1].x()-A[startPos].x(),A[startPos + 1].y()-A[startPos].y()});
 
-                            if (i == startPos) break;
+                            if (isInside({A[startPos].x()+v.x()*2,A[startPos].y()+v.y()*2},B)){
+                                for (int i = startPos-1;; i--) {
+                                    if (i == 0) i = A_size-1;
 
-                            res << A[i];
+                                    if (i == startPos) {
+                                        res << res[startPos];
+                                        break;
+                                    }
 
-                            if (list.contains(A[i])){
-                                if (table[A[i]].visited){
-                                    break;
-                                }else{
-                                    table[A[i]].visited = true;
+                                    res << A[i];
 
-                                    pc = table[A[i]];
+                                    if (list.contains(A[i])){
+                                        if (table[A[i]].visited){
+                                            break;
+                                        }else{
+                                            table[A[i]].visited = true;
 
+                                            pc = table[A[i]];
 
+                                            v = normalizedVector({B[pc.B_idx + 1].x()-A[i].x(),B[pc.B_idx + 1].y()-A[i].y()});
 
-                                    auto v = normalizedVector({B[pc.B_idx + 1].x()-A[i].x(),B[pc.B_idx + 1].y()-A[i].y()});
+                                            if (isInside({A[i].x()+v.x()*2,A[i].y()+v.y()*2},A)){
+                                                for (int j = pc.B_idx-1;;j--) {
+                                                    if (j == 0) j = B_size-1;
 
-                                    if (isInside({A[i].x()+v.x()*2,A[i].y()+v.y()*2},A)){
-                                        for (int j = pc.B_idx-1;;j--) {
-                                            if (j == 0) j = B_size-1;
+                                                    res << B[j];
 
-                                            res << B[j];
+                                                    if (list.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
+                                                    }
+                                                }
+                                            }else{
+                                                for (int j = pc.B_idx+1;; j++) {
+                                                    if (j >= B_size) j = 0;
 
-                                            if (list.contains(B[j])){
-                                                table[B[j]].visited = true;
-                                                i = table[B[j]].A_idx;
-                                                break;
+                                                    res << B[j];
+
+                                                    if (table.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
+                                                    }
+                                                }
                                             }
-                                        }
-                                    }else{
-                                        for (int j = pc.B_idx+1;; j++) {
-                                            if (j >= B_size) j = 0;
 
-                                            res << B[j];
-
-                                            if (table.contains(B[j])){
-                                                table[B[j]].visited = true;
-                                                i = table[B[j]].A_idx;
-                                                break;
-                                            }
+                                            if (i == startPos) break;
                                         }
                                     }
                                 }
+                            }else{
+                                for (int i = startPos+1;; i++) {
+                                    if (i >= A_size) i = 0;
+
+                                    if (i == startPos) {
+                                        res << res[startPos];
+                                        break;
+                                    }
+
+                                    res << A[i];
+
+                                    if (list.contains(A[i])){
+                                        if (table[A[i]].visited){
+                                            break;
+                                        }else{
+                                            table[A[i]].visited = true;
+
+                                            pc = table[A[i]];
+
+                                            v = normalizedVector({B[pc.B_idx + 1].x()-A[i].x(),B[pc.B_idx + 1].y()-A[i].y()});
+
+                                            if (isInside({A[i].x()+v.x()*2,A[i].y()+v.y()*2},A)){
+                                                for (int j = pc.B_idx-1;;j--) {
+                                                    if (j == 0) j = B_size-1;
+
+                                                    res << B[j];
+
+                                                    if (list.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
+                                                    }
+                                                }
+                                            }else{
+                                                for (int j = pc.B_idx+1;; j++) {
+                                                    if (j >= B_size) j = 0;
+
+                                                    res << B[j];
+
+                                                    if (table.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (i == startPos) break;
+                                    }
+                                }
                             }
-                        }
+
+                            startPos = -1;
+                            for (auto &p : table){
+                                if (!p.visited){
+                                    startPos = p.A_idx;
+                                    res << A[startPos];
+                                    p.visited = true;
+                                    break;
+                                }
+                            }
+                        }while(startPos != -1);
+
+                        res << res[0];
                     }else{
                         res << A << B;
+                        res << res[0];
                     }
 
-                    res << res[0];
                     result.value.setValue(res);
                     qDebug() << "\t" << res;
 
