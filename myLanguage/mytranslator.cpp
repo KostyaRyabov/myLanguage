@@ -194,16 +194,9 @@ bool MyTranslator::operation(){
         R.type = "float";
         if (!rightPart(R)) return false;
 
-        QPointF o;
         auto list = obj.value.value<QList<QPointF>>();
 
-        for (auto &p : list){
-            o.setX(o.x() + p.x());
-            o.setY(o.y() + p.y());
-        }
-
-        o.setX(o.x() / list.size());
-        o.setY(o.y() / list.size());
+        QPointF o = getCenter(list);
 
         float radians = R.value.toFloat() * 3.14159265 / 180;
 
