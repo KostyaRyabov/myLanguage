@@ -24,10 +24,13 @@ Window {
 
         onPaint: {
             var ctx = getContext("2d");
+            var backCtx = backCanvas.getContext('2d');
+
             ctx.reset()
 
             ctx.lineWidth = 2;
             ctx.strokeStyle = "black"
+
 
             for (let f = 0; f < translator.amountOfFigures(); f++){
                 ctx.beginPath();
@@ -42,12 +45,10 @@ Window {
                         ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
                         for (; p < translator.amountOfPointsOnFigure(f); p++){
                             if (drawingCanvas.list.includes(p)) {
-                                if (p > 0) {
-                                    console.log("e:",p)
-                                    ctx.closePath();
-                                }
+                                //ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
                                 ctx.moveTo(translator.getX(f,p), translator.getY(f,p))
                             }else{
+                                //ctx.moveTo(translator.getX(f,p), translator.getY(f,p))
                                 ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
                             }
                         }
@@ -56,23 +57,33 @@ Window {
 
                         if (translator.getX(f,p) === translator.getX(f,0) && translator.getY(f,p) === translator.getY(f,0)){
                             ctx.fillStyle = "rgba(255, 136, 26, 0.4)";
-                            ctx.fill('evenodd');
+                            ctx.fill();
                         }
 
-                        ctx.stroke()
+                        ctx.stroke();
                     }
 
                     ctx.fillStyle = "rgba(255, 26, 26, 0.4)";
 
                     for (p = 0; p < translator.amountOfPointsOnFigure(f); p++){
                         ctx.beginPath();
-                        ctx.arc(translator.getX(f,p), translator.getY(f,p), 4, 360, 0, false);
+                        ctx.arc(translator.getX(f,p), translator.getY(f,p), 3, 360, 0, false);
                         ctx.fill();
                         ctx.stroke()
                     }
                 }
+
+
             }
         }
+    }
+
+    Canvas{
+        id: backCanvas
+        width:drawingCanvas.width
+        height: drawingCanvas.height
+
+        visible: false
     }
 
     Rectangle{
@@ -115,13 +126,11 @@ Window {
                 id: textInput
 
                 text: "figure s1 = {(100,100),(300,100),(300,300),(250,150),(150,150),(100,300),(100,100)};
-figure s2 = {(50,200),(350,200),(350,250),(50,250),(50,200)}*[1,1]+[0,-20];
-draw (s1-s2);"
+figure s2 = {(50,200),(350,200),(350,250),(50,250),(50,200)}*[1,0.9];
+figure s3 = (s2-[0,20]);
+figure s4 = (s2-[0,-20]);
+draw (s3,s4,(s3+s4)+[350,0]);"
 
-                /*
-                    figure s = s1 + s2;
-                    draw (s1,s2);
-                */
                 placeholderText: qsTr("Введите команду...")
 
                 onTextChanged: {

@@ -12,7 +12,7 @@
 const double EPS = 0.1;
 
 inline bool between (float a,float b, float c) {
-    return std::min(a,b) <= c + EPS && c <= std::max(a,b) + EPS;
+    return std::fmin(a,b) <= c + EPS && c <= std::fmax(a,b) + EPS;
 }
 
 struct t_Variable{
@@ -83,12 +83,13 @@ private:
 
     QPointF getCenter(QList<QPointF> &figure);
     bool isFilledFigure(QList<QPointF> &figure) const;
-    bool isInside(QPointF point, QList<QPointF> &figure);
+    bool isInside(QPointF point, QList<QPointF> &figure, bool Ignore_borders = false);
     int Intersection(QPointF &a1,QPointF &a2, QList<QPointF> &figure);
     QList<QPointF>  IntersectionList(QList<QPointF> &A, QList<QPointF> &B);
     int getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figure, float *dist = nullptr);
     int getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure);
     QPointF normalizedVector(QPointF v);
+    bool cross (QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, QPointF *res = nullptr);
 signals:
     void getError(QString text, int pos);
     void DrawChanged();

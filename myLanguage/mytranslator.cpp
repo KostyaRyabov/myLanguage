@@ -79,8 +79,6 @@ QVariantList MyTranslator::getHidenEdges(int FigureID) const{
         }
     }
 
-    qDebug() << "\tlist = " << list;
-
     return list;
 }
 
@@ -310,15 +308,14 @@ bool MyTranslator::operation(){
 
 QPointF MyTranslator::getCenter(QList<QPointF> &figure){
     QPointF o;
-    int size = figure.size()-1;
+    int size = figure.size()-1,count = 0;
 
     for (int i = 0; i < size; i++){
-        o.setX(o.x() + figure[i].x());
-        o.setY(o.y() + figure[i].y());
+        o += figure[i];
+        count++;
     }
 
-    o.setX(o.x() / size);
-    o.setY(o.y() / size);
+    o /= count;
 
     return o;
 }
@@ -328,32 +325,37 @@ bool MyTranslator::isFilledFigure(QList<QPointF> &figure) const{
 }
 
 QPointF MyTranslator::normalizedVector(QPointF v){
-    float len = sqrt(pow(v.x(),2) + pow(v.y(),2));
-
-    return  {v.x()/len,v.y()/len};
+    return  v/(sqrt(pow(v.x(),2) + pow(v.y(),2)));
 }
 
-bool MyTranslator::isInside(QPointF point, QList<QPointF> &figure){
+bool MyTranslator::isInside(QPointF point, QList<QPointF> &figure, bool Ignore_borders){
     int size = figure.size()-1, count=0;
-    float ax1,ax2,bx1,bx2,ay1,ay2,by1,by2,v1,v2,v3,v4,dist;
+    float ax1,ax2,bx1,bx2,ay1,ay2,by1,by2;
 
     bx1 = point.x();
     by1 = point.y();
     bx2 = 2000;
     by2 = 2000;
 
+    QPointF vec = point+QPointF{2000,2000}, cp;
+
     for (int i = 0; i < size; i++){
+        if (figure[i] == point) return true;
+
         ax1 = figure[i].x();
         ay1 = figure[i].y();
         ax2 = figure[i+1].x();
         ay2 = figure[i+1].y();
 
-        v1=(bx2-bx1)*(ay1-by1)-(by2-by1)*(ax1-bx1);
-        v2=(bx2-bx1)*(ay2-by1)-(by2-by1)*(ax2-bx1);
-        v3=(ax2-ax1)*(by1-ay1)-(ay2-ay1)*(bx1-ax1);
-        v4=(ax2-ax1)*(by2-ay1)-(ay2-ay1)*(bx2-ax1);
+        if (std::abs(by1 - ay2) *  (ax1 - ax2)  - (bx1 - ax2) * (ay1 - ay2) <= EPS) {
+            if (between(ax1,ax2,bx1) && between(ay1,ay2,by1)) {
+                qDebug() << "точка лежит на отрезке";
+                return !Ignore_borders;
+            }
+        }
 
-        if ((v1*v2<0) && (v3*v4<0)) {
+        if (cross(point,vec,figure[i],figure[i+1]),&cp){
+            if (figure[i] == cp) continue;
             count++;
         }
     }
@@ -396,42 +398,33 @@ int MyTranslator::getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figur
     return idx;
 }
 
-
 QList<QPointF> MyTranslator::IntersectionList(QList<QPointF> &A, QList<QPointF> &B){
-    float a1,b1,c1,a2,b2,c2,x1,x2,x3,x4,y1,y2,y3,y4,div;
     uint32_t size_A = A.size()-1,
             size_B = B.size()-1;
 
     QList<QPointF> list;
+    QPointF p,f;
 
     for (uint32_t i = 0; i < size_A; i++){
-        x1 = A[i].x();
-        y1 = A[i].y();
-        x2 = A[i+1].x();
-        y2 = A[i+1].y();
-
-        a1 = y2-y1;
-        b1 = x1-x2;
-        c1 = y1*x2-x1*y2;
-
         for (uint32_t j = 0; j < size_B; j++){
-            x3 = B[j].x();
-            y3 = B[j].y();
-            x4 = B[j+1].x();
-            y4 = B[j+1].y();
+            if (cross(A[i],A[i+1],B[j],B[j+1],&p)){
+                if (!list.contains(p)) list << p;
+            }
 
-            a2 = y4-y3;
-            b2 = x3-x4;
-            c2 = y3*x4-x3*y4;
 
-            div = (a1 * b2 - a2 * b1);
+            if (std::abs((A[i].x()-A[i+1].x())*(B[j].y()-B[j+1].y())-(A[i].y()-A[i+1].y())*(B[j].x()-B[j+1].x())) <= EPS){
+                // линии параллельны
 
-            if (std::abs(div) >= EPS){
-                float x = (b1 * c2 - b2 * c1) / div;
-                float y = (a2 * c1 - a1 * c2) / div;
+                f = (A[i]+A[i+1]+B[j]+B[j+1])/4;
 
-                if (between(x1,x2,x) && between(y1,y2,y) && between(x3,x4,x) && between(y3,y4,y)){
-                    if (!list.contains({x,y})) list.append({x,y});
+                if (std::abs((f.x()-A[i+1].x())*(A[i].y()-A[i+1].y())-(f.y()-A[i+1].y())*(A[i].x()-A[i+1].x())) <= EPS){
+                    // усредненная точка находится на искомой линии
+
+                    if (between(A[i].x(),A[i+1].x(),f.x()) && between(A[i].y(),A[i+1].y(),f.y())){
+                        // если точка находится на одной из линий
+
+                        if (!list.contains(f)) list << f;
+                    }
                 }
             }
         }
@@ -441,28 +434,13 @@ QList<QPointF> MyTranslator::IntersectionList(QList<QPointF> &A, QList<QPointF> 
 }
 
 int MyTranslator::Intersection(QPointF &A,QPointF &B,  QList<QPointF> &figure){
-    float v1,v2,v3,v4,x1,x2,x3,x4,y1,y2,y3,y4;
-    int size = figure.size()-1;
+    uint32_t size = figure.size()-1;
 
-    x1 = A.x();
-    y1 = A.y();
-    x2 = B.x();
-    y2 = B.y();
+    QList<QPointF> list;
+    QPointF p;
 
-    for (int i = 0; i < size; i++){
-        x3 = figure[i].x();
-        y3 = figure[i].y();
-        x4 = figure[(i+1)%size].x();
-        y4 = figure[(i+1)%size].y();
-
-        v1=(x4-x3)*(y1-y3)-(y4-y3)*(x1-x3);
-        v2=(x4-x3)*(y2-y3)-(y4-y3)*(x2-x3);
-        v3=(x2-x1)*(y3-y1)-(y2-y1)*(x3-x1);
-        v4=(x2-x1)*(y4-y1)-(y2-y1)*(x4-x1);
-
-        if ((v1*v2<0) and (v3*v4<0)) {
-            return i;
-        }
+    for (uint32_t j = 0; j < size; j++){
+        if (cross(A,B,figure[j],figure[j+1],&p)) if (!list.contains(p)) list << p;
     }
 
     return -1;
@@ -497,6 +475,41 @@ int MyTranslator::getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure){
     return idx;
 }
 
+bool MyTranslator::cross (QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, QPointF *res){
+    float a1,b1,c1,a2,b2,c2,x1,x2,x3,x4,y1,y2,y3,y4,div;
+
+    x1 = L11.x();
+    y1 = L11.y();
+    x2 = L12.x();
+    y2 = L12.y();
+
+    a1 = y2-y1;
+    b1 = x1-x2;
+    c1 = y1*x2-x1*y2;
+
+    x3 = L21.x();
+    y3 = L21.y();
+    x4 = L22.x();
+    y4 = L22.y();
+
+    a2 = y4-y3;
+    b2 = x3-x4;
+    c2 = y3*x4-x3*y4;
+
+    div = (a1 * b2 - a2 * b1);
+
+    if (std::abs(div) >= EPS){
+        float x = (b1 * c2 - b2 * c1) / div;
+        float y = (a2 * c1 - a1 * c2) / div;
+
+        if (between(x1,x2,x) && between(y1,y2,y) && between(x3,x4,x) && between(y3,y4,y)){
+            if (res) *res = {x,y};
+            return true;
+        }
+    }
+
+    return false;
+}
 
 bool MyTranslator::rightPart(t_Variable &result){
     bool minus = false;
@@ -612,142 +625,101 @@ bool MyTranslator::rightPart(t_Variable &result){
                             A = tmp.value.value<QList<QPointF>>(),
                             B = result.value.value<QList<QPointF>>();
 
+                    if (A.size() < B.size()) std::swap(A,B);
+
                     QList<QPointF> list = IntersectionList(A,B);
                     QHash<QPointF, RowData> table;
 
                     uint32_t A_idx = 0, B_idx;
 
-                    for (auto &p : list){
-                        A_idx = getIdxOfMinPerpendicular(p, A);
-                        if (A[A_idx] != p) A.insert(A_idx,p);
-
-                        B_idx = getIdxOfMinPerpendicular(p, B);
-                        if (B[B_idx] != p) B.insert(B_idx ,p);
+                    int k =  B.size()-1;
+                    for (; k >= 0; k--){
+                        if (!isInside(B[k],A)) break;
                     }
 
-                    int
-                            A_size = A.size()-1,
-                            B_size = B.size()-1;
+                    if (k == -1){
+                        qDebug() <<  "(4) фигура В полностью внутри А";
+                        res = A;
+                    }else if (list.size() > 0){
+                        for (auto &p : list){
+                            A_idx = getIdxOfMinPerpendicular(p, A);
+                            if (A[A_idx] != p) A.insert(A_idx,p);
 
-                    for (int i = 0;i < A_size;i++) if (list.contains(A[i])) table[A[i]].A_idx = i;
-                    for (int i = 0;i < B_size;i++) if (list.contains(B[i])) table[B[i]].B_idx = i;
+                            B_idx = getIdxOfMinPerpendicular(p, B);
+                            if (B[B_idx] != p) B.insert(B_idx ,p);
+                        }
 
-                    if (list.size() > 0){
+
+                        //result.value.setValue(B);
+                        //return true;
+
+                        int    A_size = A.size()-1,
+                                B_size = B.size()-1;
+
+                        for (int i = 0;i < A_size;i++) if (list.contains(A[i])) table[A[i]].A_idx = i;
+                        for (int i = 0;i < B_size;i++) if (list.contains(B[i])) table[B[i]].B_idx = i;
+
                         RowData pc;
 
                         int startPos = -1;
 
                         for (int i = 0; i < A_size; i++) {
-                            if (!isInside(A[i],B) && !table.contains(A[i])) {
+                            if (!(isInside(A[i],B) || table.contains(A[i]))) {
                                 startPos = i;
-                                res<<A[i];
                                 break;
                             }
                         }
 
                         if (startPos == -1){
-                            result.value.setValue(A);
+                            qDebug() <<  "(1) фигура А полностью внутри В";
+                            res = B;
                         }else{
                             QPointF v;
 
-                            do{
-                                v = normalizedVector({A[startPos + 1].x()-A[startPos].x(),A[startPos + 1].y()-A[startPos].y()});
+                            res<<A[startPos];
 
-                                if (isInside({A[startPos].x()+v.x()*2,A[startPos].y()+v.y()*2},B)){
-                                    for (int i = startPos-1;; i--) {
-                                        if (i == 0) i = A_size-1;
+                            v = normalizedVector(A[startPos+1]-A[startPos]);
 
-                                        if (i == startPos) {
-                                            res << res[startPos];
+                            if (isInside(A[startPos]+v,B,true)){
+                                for (int i = startPos-1;; i--) {
+                                    if (i <= 0) i = A_size-1;
+
+                                    if (i == startPos) break;
+
+                                    res << A[i];
+
+                                    if (list.contains(A[i])){
+                                        if (table[A[i]].visited){
                                             break;
-                                        }
+                                        }else{
+                                            table[A[i]].visited = true;
 
-                                        res << A[i];
+                                            pc = table[A[i]];
 
-                                        if (list.contains(A[i])){
-                                            if (table[A[i]].visited){
-                                                break;
-                                            }else{
-                                                table[A[i]].visited = true;
+                                            v = normalizedVector(B[pc.B_idx + 1]-A[i]);
 
-                                                pc = table[A[i]];
+                                            if (isInside(A[i]+v,A,true)){
+                                                for (int j = pc.B_idx-1;;j--) {
+                                                    if (j == 0) j = B_size-1;
 
-                                                v = normalizedVector({B[pc.B_idx + 1].x()-A[i].x(),B[pc.B_idx + 1].y()-A[i].y()});
+                                                    res << B[j];
 
-                                                if (isInside({A[i].x()+v.x()*2,A[i].y()+v.y()*2},A)){
-                                                    for (int j = pc.B_idx-1;;j--) {
-                                                        if (j == 0) j = B_size-1;
-
-                                                        res << B[j];
-
-                                                        if (list.contains(B[j])){
-                                                            table[B[j]].visited = true;
-                                                            i = table[B[j]].A_idx;
-                                                            break;
-                                                        }
-                                                    }
-                                                }else{
-                                                    for (int j = pc.B_idx+1;; j++) {
-                                                        if (j >= B_size) j = 0;
-
-                                                        res << B[j];
-
-                                                        if (table.contains(B[j])){
-                                                            table[B[j]].visited = true;
-                                                            i = table[B[j]].A_idx;
-                                                            break;
-                                                        }
+                                                    if (list.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
                                                     }
                                                 }
-
-                                                if (i == startPos) break;
-                                            }
-                                        }
-                                    }
-                                }else{
-                                    for (int i = startPos+1;; i++) {
-                                        if (i >= A_size) i = 0;
-
-                                        if (i == startPos) {
-                                            res << res[startPos];
-                                            break;
-                                        }
-
-                                        res << A[i];
-
-                                        if (list.contains(A[i])){
-                                            if (table[A[i]].visited){
-                                                break;
                                             }else{
-                                                table[A[i]].visited = true;
+                                                for (int j = pc.B_idx+1;; j++) {
+                                                    if (j >= B_size) j = 0;
 
-                                                pc = table[A[i]];
+                                                    res << B[j];
 
-                                                v = normalizedVector({B[pc.B_idx + 1].x()-A[i].x(),B[pc.B_idx + 1].y()-A[i].y()});
-
-                                                if (isInside({A[i].x()+v.x()*2,A[i].y()+v.y()*2},A)){
-                                                    for (int j = pc.B_idx-1;;j--) {
-                                                        if (j == 0) j = B_size-1;
-
-                                                        res << B[j];
-
-                                                        if (list.contains(B[j])){
-                                                            table[B[j]].visited = true;
-                                                            i = table[B[j]].A_idx;
-                                                            break;
-                                                        }
-                                                    }
-                                                }else{
-                                                    for (int j = pc.B_idx+1;; j++) {
-                                                        if (j >= B_size) j = 0;
-
-                                                        res << B[j];
-
-                                                        if (table.contains(B[j])){
-                                                            table[B[j]].visited = true;
-                                                            i = table[B[j]].A_idx;
-                                                            break;
-                                                        }
+                                                    if (table.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
                                                     }
                                                 }
                                             }
@@ -756,30 +728,77 @@ bool MyTranslator::rightPart(t_Variable &result){
                                         }
                                     }
                                 }
+                            }else{
+                                for (int i = startPos+1;; i++) {
+                                    if (i >= A_size) i = 0;
 
-                                startPos = -1;
-                                for (auto &p : table){
-                                    if (!p.visited){
-                                        res << res[0];
-                                        startPos = p.A_idx;
-                                        res << A[startPos];
-                                        p.visited = true;
-                                        break;
+                                    if (i == startPos) break;
+
+                                    res << A[i];
+
+                                    if (list.contains(A[i])){
+                                        if (table[A[i]].visited){
+                                            break;
+                                        }else{
+                                            table[A[i]].visited = true;
+
+                                            pc = table[A[i]];
+
+                                            v = normalizedVector(B[pc.B_idx + 1]-A[i]);
+
+                                            if (isInside(A[i]+v,A,true)){
+                                                for (int j = pc.B_idx-1;;j--) {
+                                                    if (j == 0) j = B_size-1;
+
+                                                    res << B[j];
+
+                                                    if (list.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
+                                                    }
+                                                }
+                                            }else{
+                                                for (int j = pc.B_idx+1;; j++) {
+                                                    if (j >= B_size) j = 0;
+
+                                                    res << B[j];
+
+                                                    if (table.contains(B[j])){
+                                                        table[B[j]].visited = true;
+                                                        i = table[B[j]].A_idx;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (i == startPos) break;
                                     }
                                 }
-                            }while(startPos != -1);
+                            }
 
                             res << res[0];
-
-                            result.value.setValue(res);
                         }
                     }else{
-                        res << A << B;
-                        res << res[0];
+                        int i = A.size()-1;
 
-                        result.value.setValue(res);
+                        for (; i >= 0; i--){
+                            if (!isInside(A[i],B)) break;
+                        }
+
+                        if (i != -1){
+                            qDebug() <<  "(2) фигуры А и В не имеют пересечений";
+
+                            res << A << B;
+                            res << res[0];
+                        }else{
+                            qDebug() <<  "(3) A внутри B";
+                            res << B;
+                        }
                     }
 
+                    result.value.setValue(res);
                 }else{
                     throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
                     return false;
@@ -884,10 +903,10 @@ bool MyTranslator::rightPart(t_Variable &result){
                             A_size = A.size()-1,
                             B_size = B.size()-1;
 
-                    for (int i = 0;i < A_size;i++) if (list.contains(A[i])) table[A[i]].A_idx = i;
-                    for (int i = 0;i < B_size;i++) if (list.contains(B[i])) table[B[i]].B_idx = i;
-
                     if (list.size() > 0){
+                        for (int i = 0;i < A_size;i++) if (list.contains(A[i])) table[A[i]].A_idx = i;
+                        for (int i = 0;i < B_size;i++) if (list.contains(B[i])) table[B[i]].B_idx = i;
+
                         RowData pc;
 
                         int startPos = -1;
@@ -913,7 +932,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                                         if (i == 0) i = A_size-1;
 
                                         if (i == startPos) {
-                                            res << res[startPos];
+                                            res << A[startPos];
                                             break;
                                         }
 
@@ -964,7 +983,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                                         if (i >= A_size) i = 0;
 
                                         if (i == startPos) {
-                                            res << res[startPos];
+                                            res << A[startPos];
                                             break;
                                         }
 
@@ -1027,9 +1046,21 @@ bool MyTranslator::rightPart(t_Variable &result){
                             res << res[0];
                         }
                     }else{
-                        res << A << B;
+                        int i = 0;
+                        for (; i < A_size; i++){
+                            if (!isInside(A[i],B)) break;
+                        }
+
+                        if (i < A_size){
+                            res << A << B;
+                        }else{
+                            res << A;
+                        }
+
                         res << res[0];
                     }
+
+                    qDebug() << res;
 
                     result.value.setValue(res);
                 }else{
