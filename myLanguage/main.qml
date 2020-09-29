@@ -125,37 +125,14 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "figure s = {(50,200),(350,200),(350,250),(50,250),(50,200)}*[1,1];
-rotate (s, 10);
+                text: "figure s = {(50,200),(350,200),(350,250),(50,250),(50,200)}*[1,1.06666];
 
-figure s1 = s;
-rotate (s1, 10);
+figure s1 = s/2;
+rotate (s1,30);
 
-figure s2 = s1;
-rotate (s2, 20);
+figure sum = s+(s+[320,20])+s1;
 
-figure s3 = s2;
-rotate (s3, 20);
-
-figure s4 = s3;
-rotate (s4, 20);
-
-figure s5 = s4;
-rotate (s5, 20);
-
-figure s6 = s5;
-rotate (s6, 20);
-
-figure s7 = s6;
-rotate (s7, 20);
-
-figure s8 = s7;
-rotate (s8, 20);
-
-figure s9 = s8;
-rotate (s9, 20);
-
-draw (s,s1,s2,s3,s4,s5,s6,s7,s8,s9);"
+draw (sum);"
 
                 placeholderText: qsTr("Введите команду...")
 
@@ -173,7 +150,7 @@ draw (s,s1,s2,s3,s4,s5,s6,s7,s8,s9);"
         Rectangle{
             id:errorRect
 
-            property rect p: 0,0,0,0
+            property rect p
 
             x: p.x + textInput.x
             y: p.y + textInput.y - flic.contentY

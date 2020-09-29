@@ -90,6 +90,9 @@ private:
     int getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure);
     QPointF normalizedVector(QPointF v);
     bool cross (QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, QPointF *res = nullptr);
+    void simpify(QList<QPointF> &figure);
+
+    QList<int> getHidenEdges(QList<QPointF> &f) const;
 signals:
     void getError(QString text, int pos);
     void DrawChanged();
