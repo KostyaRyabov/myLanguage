@@ -835,6 +835,11 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                 }
                                             }
 
+                                            if (B.transition.contains(j)) {
+                                                j = B.transition[j];
+                                                if (B.jumps.contains(j)) B.jumps[j].visited = true;
+                                            }
+
                                             for (;;) {
                                                 Rf << Bf[j];
 
@@ -903,7 +908,7 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     getFigureInfo(res);
 
-                    //simpify (res);
+                    simpify (res);
                     qDebug() << "res = " << Rf;
 
                     result.value.setValue(res);
