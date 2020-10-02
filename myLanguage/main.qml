@@ -125,12 +125,12 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "figure s = {(50,200),(350,200),(350,250),(50,250),(50,200)}*[1,1.06666];
+                text: "figure s = {(50,150),(200,150),(200,200),(50,200),(50,150)};
 
-figure s1 = s/2;
-rotate (s1,30);
+figure s1 = s*0.9+[0,55];
+rotate (s1,90);
 
-figure sum = s+(s+[320,20])+s1;
+figure sum = (s+(s+[0,100]))+s1;
 
 draw (sum);"
 

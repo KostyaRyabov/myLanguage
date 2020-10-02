@@ -20,13 +20,24 @@ struct t_Variable{
     QVariant value;
 };
 
+struct Jump{
+    int idx = -1;
+    bool visited = false;
+};
+
+struct t_Figure{
+    QList<QPointF> data;
+    QMap<int,Jump> jumps;
+    QHash<int,int> transition;
+};
+
 struct RowData{
     uint32_t A_idx;
     uint32_t B_idx;
     bool visited = false;
 };
 
-Q_DECLARE_METATYPE(t_Variable)
+Q_DECLARE_METATYPE(t_Figure)
 
 inline uint qHash(const QPointF &p) {
     return qHash(QPair<qreal, qreal> (p.x(), p.y()));
@@ -76,23 +87,24 @@ private:
     bool block(t_Variable &result);
     bool part(t_Variable &result);
 
-    QList<QList<QPointF>> Figures;
+    QList<t_Figure> Figures;
     QHash<QString, t_Variable> ObjList;
 
     QString CutWord(QString &str);
 
-    QPointF getCenter(QList<QPointF> &figure);
-    bool isFilledFigure(QList<QPointF> &figure) const;
-    bool isInside(QPointF point, QList<QPointF> &figure, bool Ignore_borders = false);
-    int Intersection(QPointF &a1,QPointF &a2, QList<QPointF> &figure);
-    QList<QPointF>  IntersectionList(QList<QPointF> &A, QList<QPointF> &B);
-    int getIdxOfMinPerpendicular(QPointF &point, QList<QPointF> &figure, float *dist = nullptr);
-    int getIdxOfNearestEdge(QPointF &point, QList<QPointF> &figure);
+    QPointF getCenter(t_Figure &figure);
+    bool isFilledFigure(t_Figure &figure) const;
+    bool isInside(QPointF point, t_Figure &figure, bool Ignore_borders = false);
+    int Intersection(QPointF &a1,QPointF &a2, t_Figure &figure);
+    QList<QPointF>  IntersectionList(t_Figure &A, t_Figure &B);
+    int getIdxOfMinPerpendicular(QPointF &point, t_Figure &figure, float *dist = nullptr);
+    int getIdxOfNearestEdge(QPointF &point, t_Figure &figure);
     QPointF normalizedVector(QPointF v);
     bool cross (QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, QPointF *res = nullptr);
-    void simpify(QList<QPointF> &figure);
+    void simpify(t_Figure &figure);
 
-    QList<int> getHidenEdges(QList<QPointF> &f) const;
+    void getHidenEdges(t_Figure &f) const;
+    void getFigureInfo(t_Figure &f) const;
 signals:
     void getError(QString text, int pos);
     void DrawChanged();
