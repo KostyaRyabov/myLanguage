@@ -574,6 +574,11 @@ void MyTranslator::getFigureInfo(t_Figure &f) const{
     }
 }
 
+float MyTranslator::Len(QPointF &A, QPointF &B){
+    auto d = A-B;
+    return (sqrt(pow(d.x(),2)+pow(d.y(),2)));
+}
+
 bool MyTranslator::cross(QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, QPointF *res){
     float a1,b1,c1,a2,b2,c2,x1,x2,x3,x4,y1,y2,y3,y4,div;
 
@@ -602,7 +607,14 @@ bool MyTranslator::cross(QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, Q
         float y = (a2 * c1 - a1 * c2) / div;
 
         if (between(x1,x2,x) && between(y1,y2,y) && between(x3,x4,x) && between(y3,y4,y)){
-            if (res != nullptr) *res = {x,y};
+            if (res != nullptr) {
+                *res = {x,y};
+
+                if (Len(*res,L11) <= EPS) *res = L11;
+                else if (Len(*res,L12) <= EPS) *res = L12;
+                else if (Len(*res,L21) <= EPS) *res = L21;
+                else if (Len(*res,L22) <= EPS) *res = L22;
+            }
             return true;
         }
     }

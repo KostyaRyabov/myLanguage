@@ -127,8 +127,8 @@ Window {
 
                 text: "figure s = {(50,150),(200,150),(200,200),(50,200),(50,150)};
 
-figure s1 = s*0.9+[0,55];
-rotate (s1,90);
+figure s1 = s*0.9+[10,55];
+rotate (s1,50);
 
 figure sum = (s+(s+[0,100]))+s1;
 
