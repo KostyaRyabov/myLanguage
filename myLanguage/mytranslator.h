@@ -104,6 +104,7 @@ private:
     void simpify(t_Figure &figure);
 
     bool onSameLine(int i, QHash<int,int> &ranges);
+    QPair<int,int> getRange(int i, QHash<int,int> &ranges);
 
     float Len(QPointF &A, QPointF &B);
 

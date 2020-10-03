@@ -129,7 +129,7 @@ Window {
 
 figure s1 = s+[130,0];
 
-figure sum = (s+(s+[0,170]))+s1;
+figure sum = (s+(s+[0,120])) + (s+[0,0]);
 
 draw (sum);"
 
