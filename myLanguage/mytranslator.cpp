@@ -822,8 +822,6 @@ bool MyTranslator::rightPart(t_Variable &result){
                                 }
 
                                 for (;;) {
-                                    if (i == startPos) break;
-
                                     Rf << Af[i];
 
                                     if (list.contains(Af[i])){
@@ -887,6 +885,8 @@ bool MyTranslator::rightPart(t_Variable &result){
                                         if (i == startPos) break;
                                     }
                                 }
+
+                                Rf << Af[i];
 
                                 startPos = -1;
                                 for (auto &jump : A.jumps){
