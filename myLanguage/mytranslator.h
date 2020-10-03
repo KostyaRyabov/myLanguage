@@ -103,6 +103,8 @@ private:
     bool cross (QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, QPointF *res = nullptr);
     void simpify(t_Figure &figure);
 
+    bool onSameLine(int i, QHash<int,int> &ranges);
+
     float Len(QPointF &A, QPointF &B);
 
     void getHidenEdges(t_Figure &f) const;

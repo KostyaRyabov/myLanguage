@@ -316,9 +316,22 @@ bool MyTranslator::operation(){
     return true;
 }
 
-void MyTranslator::simpify(t_Figure &figure){
-    qDebug() << "simplify : " << figure.jumps.keys();
+bool MyTranslator::onSameLine(int i, QHash<int,int> &ranges){
+    auto keys = ranges.keys();
 
+    for (auto &k : keys){
+        if (k <= i && i <= ranges[k]){
+            if (k <= i-1 && i+1 <= ranges[k]){
+                qDebug() << "\t\tonSameLine:" << i-1 << "->" << i+1 << " on " << k << "-" << ranges[k] ;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void MyTranslator::simpify(t_Figure &figure){
     if (figure.data.size() > 0){
         for (auto it = figure.data.begin()+1; it+1 != figure.data.end();){
             if (figure.jumps.contains(it - figure.data.begin())) {
@@ -326,15 +339,17 @@ void MyTranslator::simpify(t_Figure &figure){
                 continue;
             }
 
-            if (std::abs(it->x()-(it+1)->x()) <= EPS && std::abs(it->y()-(it+1)->y()) <= EPS){
+            if (abs(it->x()-(it+1)->x()) <= EPS && abs(it->y()-(it+1)->y()) <= EPS){
                 it = figure.data.erase(it);
-            }else if (std::abs(((it-1)->x()-(it+1)->x())*((it)->y()-(it+1)->y())-((it-1)->y()-(it+1)->y())*((it)->x()-(it+1)->x())) <= EPS){
+                getFigureInfo(figure);
+            }else if (onSameLine(it - figure.data.begin(), figure.transition) && abs(((it-1)->x()-(it+1)->x())*((it)->y()-(it+1)->y())-((it-1)->y()-(it+1)->y())*((it)->x()-(it+1)->x())) <= EPS){
                 if (figure.jumps.contains((it+1) - figure.data.begin())) {
                     it++;
                     continue;
                 }
 
                 it = figure.data.erase(it);
+                getFigureInfo(figure);
             }else it++;
         }
     }
@@ -892,6 +907,9 @@ bool MyTranslator::rightPart(t_Variable &result){
                                 for (auto &jump : A.jumps){
                                     if (!jump.visited){
                                         startPos = jump.idx;
+
+                                        if (!isInside(Af[startPos],B) && !table.contains(Af[startPos])) break;
+
                                         i = startPos;
 
                                         if (A.transition.contains(startPos)) {
@@ -943,6 +961,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                     getFigureInfo(res);
 
                     simpify (res);
+
                     qDebug() << "res = " << Rf;
 
                     result.value.setValue(res);
