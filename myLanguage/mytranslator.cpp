@@ -326,7 +326,7 @@ void MyTranslator::simpify(t_Figure &figure){
                 continue;
             }
 
-            if (std::abs(it->x()-(it+1)->x()) <= 3 && std::abs(it->y()-(it+1)->y()) <= 3){
+            if (std::abs(it->x()-(it+1)->x()) <= EPS && std::abs(it->y()-(it+1)->y()) <= EPS){
                 it = figure.data.erase(it);
             }else if (std::abs(((it-1)->x()-(it+1)->x())*((it)->y()-(it+1)->y())-((it-1)->y()-(it+1)->y())*((it)->x()-(it+1)->x())) <= EPS){
                 if (figure.jumps.contains((it+1) - figure.data.begin())) {
@@ -784,8 +784,6 @@ bool MyTranslator::rightPart(t_Variable &result){
                         int startPos = -1;
 
                         for (int i = 0; i < A_size; i++) {
-                            if (A.jumps.contains(i)) continue;
-
                             if (!isInside(Af[i],B) && !table.contains(Af[i])) {
                                 startPos = i;
                                 break;
@@ -821,9 +819,9 @@ bool MyTranslator::rightPart(t_Variable &result){
                                     }
                                 }
 
-                                for (;;) {
-                                    Rf << Af[i];
+                                Rf << Af[i];
 
+                                for (;;) {
                                     if (list.contains(Af[i])){
                                         if (table[Af[i]].visited){
                                             break;
@@ -850,9 +848,9 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                 if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                             }
 
-                                            for (;;) {
-                                                Rf << Bf[j];
+                                            Rf << Bf[j];
 
+                                            for (;;) {
                                                 if (list.contains(Bf[j])){
                                                     table[Bf[j]].visited = true;
                                                     i = table[Bf[j]].A_idx;
@@ -862,6 +860,8 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                 j+=stepB;
 
                                                 if (B.jumps.contains(j)) B.jumps[j].visited = true;
+
+                                                Rf << Bf[j];
 
                                                 if (B.transition.contains(j)){
                                                     j = B.transition[j];
@@ -875,6 +875,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                     i+=stepA;
 
+                                    Rf << Af[i];
+
                                     if (i == startPos) break;
 
                                     if (A.jumps.contains(i)) A.jumps[i].visited = true;
@@ -886,12 +888,32 @@ bool MyTranslator::rightPart(t_Variable &result){
                                     }
                                 }
 
-                                Rf << Af[i];
-
                                 startPos = -1;
                                 for (auto &jump : A.jumps){
                                     if (!jump.visited){
                                         startPos = jump.idx;
+                                        i = startPos;
+
+                                        if (A.transition.contains(startPos)) {
+                                            if ((startPos - A.transition[startPos]) > 0){
+                                                i = A.transition[startPos]+1;
+                                            }
+                                        }
+
+                                        if (!isInside(Af[i],B) && !table.contains(Af[i])) break;
+
+                                        for (;;) {
+                                            i++;
+
+                                            if (!isInside(Af[i],B) && !table.contains(Af[i])) break;
+
+                                            if (A.transition.contains(i)){
+                                                i = A.transition[i];
+                                                if (!isInside(Af[i],B) && !table.contains(Af[i])) break;
+                                            }
+                                        }
+
+                                        startPos = i;
                                         break;
                                     }
                                 }
