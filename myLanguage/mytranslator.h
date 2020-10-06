@@ -15,6 +15,12 @@ inline bool between (float a,float b, float c) {
     return std::fmin(a,b) <= c + EPS && c <= std::fmax(a,b) + EPS;
 }
 
+enum State{
+    pass_A = 0,
+    pass_B = 1,
+    end = 2
+};
+
 struct t_Variable{
     QString type;
     QVariant value;

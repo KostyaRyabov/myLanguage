@@ -325,10 +325,7 @@ bool MyTranslator::onSameLine(int i, QHash<int,int> &ranges){
     auto keys = ranges.keys();
 
     for (auto &k : keys){
-        if (k <= i-1 && i+1 <= ranges[k]){
-            qDebug() << "\t\tonSameLine:" << i-1 << "->" << i+1 << " on " << k << "-" << ranges[k] ;
-            return true;
-        }
+        if (k <= i-1 && i+1 <= ranges[k]) return true;
     }
 
     return false;
@@ -752,239 +749,178 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     QList<QPointF> &Af = A.data, &Bf = B.data, &Rf = res.data;
 
-                    if (Af.size() < Bf.size()) std::swap(A,B);
-
                     QList<QPointF> list = IntersectionList(A,B);
                     QHash<QPointF, RowData> table;
 
                     uint32_t A_idx = 0, B_idx;
 
-                    qDebug() << "insert points...";
-
                     for (auto &p : list){
                         A_idx = getIdxOfMinPerpendicular(p, A);
-
-                        qDebug() << "\tA:" << A_idx << p;
-
-                        if (Af[A_idx] != p)
-                            Af.insert(A_idx,p);
+                        if (Af[A_idx] != p) Af.insert(A_idx,p);
+                        getFigureInfo(A);
 
                         B_idx = getIdxOfMinPerpendicular(p, B);
-
-                        qDebug() << "\tB:" << B_idx << p;
-
-                        if (Bf[B_idx] != p)
-                            Bf.insert(B_idx ,p);
-
-                        getFigureInfo(A);
+                        if (Bf[B_idx] != p) Bf.insert(B_idx ,p);
                         getFigureInfo(B);
                     }
 
                     int    A_size = Af.size()-1,
                             B_size = Bf.size()-1;
 
-                    int k =  B_size;
-                    for (; k >= 0; k--){
-                        if (!isInside(Bf[k],A,true)) break;
-                    }
+                    for (int i = 0;i < A_size;i++) if (list.contains(Af[i])) table[Af[i]].A_idx = i;
+                    for (int i = 0;i < B_size;i++) if (list.contains(Bf[i])) table[Bf[i]].B_idx = i;
 
-                    if (k == -1){
-                        qDebug() <<  "(4) фигура В полностью внутри А";
-                        res = A;
-                    }else if (list.size() > 0){
-                        qDebug() << "-----";
+                    RowData pc;
 
-                        for (int i = 0;i < A_size;i++) if (list.contains(Af[i])) table[Af[i]].A_idx = i;
-                        for (int i = 0;i < B_size;i++) if (list.contains(Bf[i])) table[Bf[i]].B_idx = i;
+                    int startPos;
 
-                        RowData pc;
+                    {
+                        QPointF v;
 
-                        int startPos = -1;
+                        int8_t stepA,stepB;
+                        int i,j;
 
-                        for (int i = 0; i < A_size; i++) {
-                            if (!isInside(Af[i],B) && !table.contains(Af[i])) {
-                                startPos = i;
-                                break;
-                            }
-                        }
+                        uint8_t state = 0;
 
-                        if (startPos == -1){
-                            qDebug() <<  "(1) фигура А полностью внутри В";
-                            res = B;
-                        }else{
-                            QPointF v;
+                        Jump jump;
+                        jump.idx = 0;
+                        jump.visited = false;
 
-                            int8_t stepA,stepB;
-                            int i,j;
+                        if (A.jumps.isEmpty()) A.jumps[0] = jump;
+                        if (B.jumps.isEmpty()) B.jumps[0] = jump;
 
-                            qDebug() << " пересекают";
-
+                        do{
                             do{
-                                Rf<<Af[startPos];
-
-                                if (A.jumps.contains(startPos)) A.jumps[startPos].visited = true;
-
-                                v = normalizedVector(Af[startPos+1]-Af[startPos]);
-
-                                stepA = isInside(Af[startPos]+v,B,true)?-1:1;
-
-                                i = startPos+stepA;
-
-                                if (A.transition.contains(startPos)) {
-                                    if ((startPos - A.transition[startPos])*stepA > 0){
-                                        i = A.transition[startPos]+stepA;
-                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
-                                    }
-                                }
-
-                                Rf << Af[i];
-
-                                for (;;) {
-                                    if (list.contains(Af[i])){
-                                        if (table[Af[i]].visited){
-                                            break;
-                                        }else{
-                                            table[Af[i]].visited = true;
-
-                                            pc = table[Af[i]];
-
-                                            v = normalizedVector(Bf[pc.B_idx + 1]-Af[i]);
-
-                                            stepB = isInside(Af[i]+v,A,true)?-1:1;
-
-                                            j = pc.B_idx+stepB;
-
-                                            if (B.transition.contains(pc.B_idx)) {
-                                                if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
-                                                    j = B.transition[pc.B_idx]+stepB;
-                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
-                                                }
-                                            }
-
-                                            if (B.transition.contains(j)) {
-                                                j = B.transition[j];
-                                                if (B.jumps.contains(j)) B.jumps[j].visited = true;
-                                            }
-
-                                            Rf << Bf[j];
-
-                                            for (;;) {
-                                                if (list.contains(Bf[j])){
-                                                    table[Bf[j]].visited = true;
-                                                    i = table[Bf[j]].A_idx;
-                                                    break;
-                                                }
-
-                                                j+=stepB;
-
-                                                if (B.jumps.contains(j)) B.jumps[j].visited = true;
-
-                                                Rf << Bf[j];
-
-                                                if (B.transition.contains(j)){
-                                                    j = B.transition[j];
-                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
-                                                }
-                                            }
-                                        }
-
-                                        if (i == startPos) break;
-                                    }
-
-                                    if (A.transition.contains(i)){
-                                        i = A.transition[i];
-                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
-                                        if (i == startPos) break;
-                                    }
-
-                                    i+=stepA;
-
-                                    Rf << Af[i];
-
-                                    if (i == startPos) break;
-
-                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
-
-                                    if (A.transition.contains(i)){
-                                        i = A.transition[i];
-                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
-                                        if (i == startPos) break;
-                                    }
-                                }
-
                                 startPos = -1;
+
                                 for (auto &jump : A.jumps){
                                     if (!jump.visited){
+                                        jump.visited = true;
                                         auto range = getRange(jump.idx,A.transition);
 
-                                        startPos = range.first;
-
-                                        if (!isInside(Af[startPos],B) && !table.contains(Af[startPos])) break;
-
-                                        i = startPos;
-
-                                        if (A.transition.contains(startPos)) {
-                                            if ((startPos - A.transition[startPos]) > 0){
-                                                i = A.transition[startPos]+1;
-                                            }
-                                        }
-
-                                        if (!isInside(Af[i],B) && !table.contains(Af[i])) break;
-
-                                        qDebug() << "iter";
-
-                                        for (;;) {
-                                            i++;
-
-                                            if (!isInside(Af[i],B) && !table.contains(Af[i])) break;
-
-                                            if (i >= range.second){
-                                                for (i = range.first; i <= range.second; i++){
-                                                    Rf << Af[i];
-                                                    if (list.contains(Af[i])) table[Af[i]].visited = true;
-                                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
-                                                }
+                                        for (i = range.first; i < range.second; i++){
+                                            if (!isInside(Af[i],B) && !table.contains(Af[i])){
+                                                startPos = i;
                                                 break;
                                             }
-
-                                            qDebug() << i;
                                         }
 
-                                        if (i < range.second) {
-                                            startPos = i;
+                                        if (startPos == -1){
+                                            if (state == State::pass_A) Rf << Af.mid(range.first, (range.second-range.first+1));
+
+                                            continue;
                                         }
 
-                                        jump.visited = true;
                                         break;
                                     }
                                 }
 
+                                if (startPos != -1){
+                                    Rf<<Af[startPos];
+
+                                    if (A.jumps.contains(startPos)) A.jumps[startPos].visited = true;
+                                    v = normalizedVector(Af[startPos+1]-Af[startPos]);
+                                    stepA = isInside(Af[startPos]+v,B,true)?-1:1;
+
+                                    i = startPos+stepA;
+
+                                    if (A.transition.contains(startPos)) {
+                                        if ((startPos - A.transition[startPos])*stepA > 0){
+                                            i = A.transition[startPos]+stepA;
+                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                        }
+                                    }
+
+                                    Rf << Af[i];
+
+                                    for (;;) {
+                                        if (list.contains(Af[i])){
+                                            if (table[Af[i]].visited){
+                                                break;
+                                            }else{
+                                                table[Af[i]].visited = true;
+
+                                                pc = table[Af[i]];
+                                                v = normalizedVector(Bf[pc.B_idx + 1]-Af[i]);
+                                                stepB = isInside(Af[i]+v,A,true)?-1:1;
+
+                                                j = pc.B_idx+stepB;
+
+                                                if (B.transition.contains(pc.B_idx)) {
+                                                    if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
+                                                        j = B.transition[pc.B_idx]+stepB;
+                                                        if (B.jumps.contains(j)) B.jumps[j].visited = true;
+                                                    }
+                                                }
+
+                                                if (B.transition.contains(j)) {
+                                                    j = B.transition[j];
+                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
+                                                }
+
+                                                Rf << Bf[j];
+
+                                                for (;;) {
+                                                    if (list.contains(Bf[j])){
+                                                        table[Bf[j]].visited = true;
+                                                        i = table[Bf[j]].A_idx;
+                                                        break;
+                                                    }
+
+                                                    j+=stepB;
+
+                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
+
+                                                    Rf << Bf[j];
+
+                                                    if (B.transition.contains(j)){
+                                                        j = B.transition[j];
+                                                        if (B.jumps.contains(j)) B.jumps[j].visited = true;
+                                                    }
+                                                }
+                                            }
+
+                                            if (i == startPos) break;
+
+                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                            if (A.transition.contains(i)){
+                                                i = A.transition[i];
+                                                if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                                if (i == startPos) break;
+                                            }
+                                        }
+
+                                        i+=stepA;
+
+                                        Rf << Af[i];
+
+                                        if (i == startPos) break;
+
+                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                        if (A.transition.contains(i)){
+                                            i = A.transition[i];
+                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                            if (i == startPos) break;
+                                        }
+                                    }
+
+                                    Rf << Rf[0];
+                                }
                             }while(startPos != -1);
 
-                            Rf << Rf[0];
-                        }
-                    }else{
-                        int i = Af.size()-1;
 
-                        for (; i >= 0; i--){
-                            if (!isInside(Af[i],B)) break;
-                        }
 
-                        if (i == Af.size()-1){
-                            qDebug() <<  "(2) фигуры А и В не имеют пересечений";
 
-                            Rf << Af << Bf;
-                            Rf << Rf[0];
-                        }else{
-                            qDebug() <<  "(3) A внутри B";
-                            Rf << Bf;
-                        }
+                            state++;
+
+                            if (state == State::pass_B){
+                                std::swap(A,B);
+                            }
+                        }while(state != State::end);
                     }
 
                     getFigureInfo(res);
-                    simpify (res);
-
-                    qDebug() << "res = " << Rf;
+                    simpify(res);
 
                     result.value.setValue(res);
                 }else{
@@ -1282,7 +1218,7 @@ bool MyTranslator::block(t_Variable &result){
                     }
                     result.value.setValue(res_fig);
                 }else if (tmp.type == "vector"){
-                    t_Figure res_fig = tmp.value.value<t_Figure>();
+                    t_Figure res_fig = result.value.value<t_Figure>();
                     QPointF tmp_vec = tmp.value.toPointF();
 
                     if (tmp_vec.x() == 0 || tmp_vec.y() == 0){

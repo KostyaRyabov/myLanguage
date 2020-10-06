@@ -125,13 +125,12 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "figure s = {(50,150),(200,150),(200,200),(50,200),(50,150)};
+                text: "figure s = {(50,150),(200,150),(200,200),(50,200),(50,150)}/[1,2];
 
-figure s1 = s+[130,0];
+figure s1 = (s+[300,0])+s;
+figure s2 = s1+s;
 
-figure sum = (s+(s+[0,120])) + (s+[0,0]);
-
-draw (sum);"
+draw (s2);"
 
                 placeholderText: qsTr("Введите команду...")
 
