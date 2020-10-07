@@ -116,6 +116,9 @@ private:
 
     void getHidenEdges(t_Figure &f) const;
     void getFigureInfo(t_Figure &f) const;
+
+    bool getPointOnFigure(t_Variable &result);
+    bool getFloatOnPoint(t_Variable &result);
 signals:
     void getError(QString text, int pos);
     void DrawChanged();

@@ -110,11 +110,10 @@ bool MyTranslator::next(uint step){
 }
 
 bool MyTranslator::varName(){
-    if (is("figure") || is("float") || is("vector") || is("point") || is("draw") || is("rotate")){
+    if (is("figure") || is("float") || is("vector") || is("point") || is("draw") || is("rotate") || is("var")){
         throwError("нельзя называть обьекты служебными именами");
         return false;
     }
-
 
     if (!(*word)[0].isLetter()) {
         throwError("имя переменной должно начинаться с буквы");
@@ -149,7 +148,7 @@ bool MyTranslator::initVariable(){
 }
 
 bool MyTranslator::operation(){
-    if (is("figure") || is("float") || is("vector") || is("point")){
+    if (is("figure") || is("float") || is("vector") || is("point") || is("var")){
         if (!initVariable()) return false;
 
         auto &obj = ObjList[*word];
@@ -540,8 +539,6 @@ void MyTranslator::getFigureInfo(t_Figure &f) const{
     f.jumps.clear();
     f.transition.clear();
 
-    qDebug() << "jumps : ";
-
     for (int i = 0; i < size; i++){
         for (int j = i+1; j < size; j++){
             if (i != j){
@@ -552,22 +549,15 @@ void MyTranslator::getFigureInfo(t_Figure &f) const{
 
                         tmp.idx = j;
                         f.jumps[j] = tmp;
-
-                        qDebug() << "\t" << i << j;
                     }
                 }
             }
         }
     }
 
-    //qDebug() << "   trans : ";
-
     if (f.jumps.isEmpty()){
         f.transition[0] = size;
         f.transition[size] = 0;
-
-        //qDebug() << "\t" << -1 <<size-1;
-        //qDebug() << "\t" << size << 0;
     }else{
         auto jumps = f.jumps;
 
@@ -576,15 +566,9 @@ void MyTranslator::getFigureInfo(t_Figure &f) const{
         auto keys = jumps.keys();
         int k_size = keys.size()-1;
 
-        //qDebug() << keys;
-
         for (int i = 0; i < k_size; i++){
             f.transition[keys[i+1]] = keys[i]+1;
             f.transition[keys[i]+1] = keys[i+1];
-
-            qDebug() << keys[i+1] << keys[i]+1;
-            qDebug() << keys[i]+1 << keys[i+1];
-            qDebug() << "\t";
         }
     }
 }
@@ -1211,7 +1195,7 @@ bool MyTranslator::rightPart(t_Variable &result){
     }
 
     if (!outputType.isEmpty()){
-        if (result.type != outputType){
+        if (result.type != outputType && outputType != "var"){
             throwError("нельзя преобразовать '" + result.type + "' в '"+ outputType +"'");
             return false;
         }
@@ -1516,7 +1500,6 @@ bool MyTranslator::getFigure(t_Variable &result){
     word++;
 
     getFigureInfo(tmp_fig);
-    qDebug() << "get info";
     result.value.setValue(tmp_fig);
     result.type = "figure";
 
@@ -1566,7 +1549,6 @@ bool MyTranslator::getVector(t_Variable &result){
      }
      word++;
 
-     // оформляем точку
      tmp_point.setY(tmp.value.toFloat());
      result.value.setValue(tmp_point);
      result.type = "vector";
@@ -1623,18 +1605,112 @@ bool MyTranslator::part(t_Variable &result){
             throwError("после '" + *(word-1) + "' должна быть круглая скобка");
             return false;
         }
+
+        if (result.type == "point") return getFloatOnPoint(result);
     }else if (is(";")){
         throwError("после знака '=' должно быть новое значение типа '"+result.type+"'");
         return false;
     }else if (is("{")){
         if (!getFigure(result)) return false;
+
+        return getPointOnFigure(result);
     }else if (is("[")){
         if (!getVector(result)) return false;
+
+        return getFloatOnPoint(result);
     }else if (getNum(result)){
         result.type = "float";
     }else if (getVariable()){
         result = ObjList[*word];
+
+        if (result.type == "figure"){
+            return getPointOnFigure(result);
+        }else if (result.type == "point" || result.type == "vector"){
+            return getFloatOnPoint(result);
+        }
     }else return false;
+
+    return true;
+}
+
+bool MyTranslator::getFloatOnPoint(t_Variable &result){
+    if (is("[",1)){
+        next();
+
+        if (!next()){
+            throwError("введите индекс");
+            return false;
+        }
+
+        t_Variable tmp;
+        tmp.type = "float";
+
+        if (!rightPart(tmp)) return false;
+
+        if (!next()){
+            throwError("ожидалась закрыващая квадратная скобка");
+            return false;
+        }
+
+        if (!is("]")){
+            throwError("вместо "+CutWord(*word)+" ожидалась закрыващая квадратная скобка");
+            return false;
+        }
+
+        int id = tmp.value.toInt();
+
+        if (id % 2 == 0){
+            result.value.setValue(result.value.toPointF().x());
+        }else{
+            result.value.setValue(result.value.toPointF().y());
+        }
+
+        result.type = "float";
+    }
+
+    return true;
+}
+
+bool MyTranslator::getPointOnFigure(t_Variable &result){
+    if (is("[",1)){
+        next();
+
+        if (!next()){
+            throwError("введите индекс");
+            return false;
+        }
+
+        t_Variable tmp;
+        tmp.type = "float";
+
+        if (!rightPart(tmp)) return false;
+
+        if (!next()){
+            throwError("ожидалась закрыващая квадратная скобка");
+            return false;
+        }
+
+        if (!is("]")){
+            throwError("вместо "+CutWord(*word)+" ожидалась закрыващая квадратная скобка");
+            return false;
+        }
+
+        result.type = "point";
+        auto list = result.value.value<t_Figure>().data;
+
+        int id = tmp.value.toInt();
+        int size = list.size()-1;
+
+        if (size < 0){
+            result.value.setValue(QPointF());
+            return true;
+        }
+
+        if (id<0) id = size+id%size;
+        else id %= size;
+
+        result.value.setValue(list.at(id%(list.size()-1)));
+    }
 
     return true;
 }
