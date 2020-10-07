@@ -1067,6 +1067,17 @@ bool MyTranslator::rightPart(t_Variable &result){
                             for (auto &cross_point : table){
                                 if (!cross_point.visited){
                                     startPos = cross_point.A_idx;
+
+                                    v = normalizedVector(Af[startPos+1]-Af[startPos]);
+                                    stepA = isInside(Af[startPos]+v,B,true)?-1:1;
+
+                                    if (A.transition.contains(startPos)) {
+                                        if ((startPos - A.transition[startPos])*stepA > 0){
+                                            startPos = A.transition[startPos]+stepA;
+                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                        }
+                                    }
+
                                     break;
                                 }
                             }
