@@ -806,9 +806,25 @@ bool MyTranslator::rightPart(t_Variable &result){
                                         }
 
                                         if (startPos == -1){
-                                            if (state == State::pass_A) Rf << Af.mid(range.first, (range.second-range.first+1));
+                                            for (i = range.first; i < range.second; i++){
+                                                if (!isInside(Af[i],B,true)) break;
+                                            }
+
+                                            if (i != range.second){
+                                                if (state == State::pass_A) Rf << Af.mid(range.first, (range.second-range.first+1));
+                                            }
 
                                             continue;
+                                        }else{
+                                            for (i = range.first; i < range.second; i++){
+                                                if (table.contains(Af[i])){
+                                                    if (table[Af[i]].visited){
+                                                        startPos = -1;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            if (i < range.second) continue;
                                         }
 
                                         break;
@@ -824,6 +840,7 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                     i = startPos+stepA;
 
+                                    if (A.jumps.contains(startPos)) A.jumps[startPos].visited = true;
                                     if (A.transition.contains(startPos)) {
                                         if ((startPos - A.transition[startPos])*stepA > 0){
                                             i = A.transition[startPos]+stepA;
@@ -844,8 +861,11 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                 v = normalizedVector(Bf[pc.B_idx + 1]-Af[i]);
                                                 stepB = isInside(Af[i]+v,A,true)?-1:1;
 
+                                                if (B.jumps.contains(pc.B_idx)) B.jumps[pc.B_idx].visited = true;
+
                                                 j = pc.B_idx+stepB;
 
+                                                if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                 if (B.transition.contains(pc.B_idx)) {
                                                     if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
                                                         j = B.transition[pc.B_idx]+stepB;

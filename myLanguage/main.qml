@@ -127,10 +127,11 @@ Window {
 
                 text: "figure s = {(50,150),(200,150),(200,200),(50,200),(50,150)}/[1,2];
 
-figure s1 = (s+[300,0])+s;
-figure s2 = s1+s;
+figure s1 = (s+[0,100])+s;
+figure s2 = s1+[0,70];
+rotate (s2,90);
 
-draw (s2);"
+draw ((s1+s/2)+s2);"
 
                 placeholderText: qsTr("Введите команду...")
 
