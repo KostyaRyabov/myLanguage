@@ -2,6 +2,8 @@ import QtQuick 2.12
 import QtQuick.Window 2.12
 import QtQuick.Controls 2.12
 
+import QtQuick.Shapes 1.12
+
 import Translator 1.0
 
 Window {
@@ -39,23 +41,21 @@ Window {
 
                 if (translator.amountOfPointsOnFigure(f) > 0){
 
-                    var p = 1;
+                    var pp = 1;
 
                     if (translator.amountOfPointsOnFigure(f) > 1){
                         ctx.moveTo(translator.getX(f,0), translator.getY(f,0))
-                        for (; p < translator.amountOfPointsOnFigure(f); p++){
-                            if (drawingCanvas.list.includes(p)) {
-                                //ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
-                                ctx.moveTo(translator.getX(f,p), translator.getY(f,p))
+                        for (; pp < translator.amountOfPointsOnFigure(f); pp++){
+                            if (drawingCanvas.list.includes(pp)) {
+                                ctx.moveTo(translator.getX(f,pp), translator.getY(f,pp))
                             }else{
-                                //ctx.moveTo(translator.getX(f,p), translator.getY(f,p))
-                                ctx.lineTo(translator.getX(f,p), translator.getY(f,p))
+                                ctx.lineTo(translator.getX(f,pp), translator.getY(f,pp))
                             }
                         }
 
                         p--;
 
-                        if (translator.getX(f,p) === translator.getX(f,0) && translator.getY(f,p) === translator.getY(f,0)){
+                        if (translator.getX(f,pp) === translator.getX(f,0) && translator.getY(f,pp) === translator.getY(f,0)){
                             ctx.fillStyle = "rgba(255, 136, 26, 0.4)";
                             ctx.fill();
                         }
@@ -65,15 +65,13 @@ Window {
 
                     ctx.fillStyle = "rgba(255, 26, 26, 0.4)";
 
-                    for (p = 0; p < translator.amountOfPointsOnFigure(f); p++){
+                    for (pp = 0; pp < translator.amountOfPointsOnFigure(f); pp++){
                         ctx.beginPath();
-                        ctx.arc(translator.getX(f,p), translator.getY(f,p), 3, 360, 0, false);
+                        ctx.arc(translator.getX(f,pp), translator.getY(f,pp), 3, 360, 0, false);
                         ctx.fill();
                         ctx.stroke()
                     }
                 }
-
-
             }
         }
     }
@@ -117,16 +115,13 @@ Window {
                 color: "#8dc3c8"
                 visible: textInput.activeFocus
 
-                 Behavior on y{
-                    NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 }
-                }
+                Behavior on y{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 }}
             }
 
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "point s = (100,200);
-float x = s[0];"
+                text: ""
 
                 placeholderText: qsTr("Введите команду...")
 
@@ -144,12 +139,60 @@ float x = s[0];"
         Rectangle{
             id:errorRect
 
-            property rect p
+            property rect p;
+            property int newY: 0
 
             x: p.x + textInput.x
             y: p.y + textInput.y - flic.contentY
             width: codeArea.width - p.x - 10
             height: p.height
+
+            onXChanged: {
+                messageBox.x = errorRect.x-messageBox.width/2;
+
+                if (messageBox.x < 10) messageBox.x = 10;
+                else if (messageBox.x + messageBox.width > codeArea.width-10) messageBox.x = codeArea.width-messageBox.width-10;
+            }
+
+            onYChanged: {
+                newY = errorRect.y+messageBox.height/2+10;
+
+                if (newY < 20) {
+                    arrow.opacity = 0.8;
+                    arrow.scale = -1;
+
+                    pointer.opacity = 0;
+                    pointer.scale = 0;
+
+                    newY = 20;
+                } else if (newY+messageBox.height > codeArea.height-errorRect.height) {
+                    if (codeArea.height <= errorRect.y+errorRect.height){
+                        arrow.opacity = 0.8;
+                        arrow.scale = 1;
+
+                        pointer.opacity = 0;
+                        pointer.scale = 0;
+
+                        newY = codeArea.height-messageBox.height-errorRect.height;
+                    }else{
+                        pointer.opacity = 0.8;
+                        pointer.scale = 1;
+
+                        arrow.scale = 0;
+                        arrow.opacity = 0;
+
+                        newY = errorRect.y - messageBox.height-5;
+                    }
+                }else {
+                    pointer.opacity = 0.8;
+                    pointer.scale = -1;
+
+                    arrow.scale = 0;
+                    arrow.opacity = 0;
+                }
+
+                messageBox.y = newY;
+            }
 
             gradient: Gradient {
                 orientation: Gradient.Horizontal
@@ -159,33 +202,88 @@ float x = s[0];"
                 GradientStop { position: 0.8; color: "transparent" }
             }
 
-            Behavior on width{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
-            Behavior on x{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 } }
-            Behavior on opacity{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 1000 } }
+            Behavior on width{ NumberAnimation { easing.type: Easing.OutElastic; duration: 300 } }
+            Behavior on y{ NumberAnimation { easing.type: Easing.OutElastic; easing.amplitude: 3.0; easing.period: 2.0; duration: 300 }}
+            Behavior on x{ NumberAnimation { easing.type: Easing.OutElastic; duration: 300 } }
+            Behavior on opacity{ NumberAnimation { easing.type: Easing.OutElastic;  duration: 1000 } }
         }
     }
 
     Rectangle{
         id: messageBox
-        width: 400
-        height: 50
+        width: errorOutput.width+10
+        height: errorOutput.height+10
+
         color: "red"
 
-        anchors.left: parent.left
-        anchors.leftMargin:  25
-        radius: 5
+        radius: 3
 
         state: "passive"
 
+        Shape {
+            id: pointer
+
+            width: 10
+            height: 8
+
+            scale: 0
+
+            x: errorRect.x-messageBox.x;
+            y: (messageBox.height-pointer.height)/2 + ((messageBox.height+pointer.height)/2)*pointer.scale;
+
+            ShapePath {
+                fillColor: "red"
+                strokeColor: "red"
+
+                startX: 0
+                startY: 0
+
+                PathLine { x: 0; y: 0 }
+                PathLine { x: pointer.width/2; y: pointer.height }
+                PathLine { x: pointer.width; y: 0 }
+            }
+
+            Behavior on scale{NumberAnimation { easing.type: Easing.InOutQuint; duration: 300 } }
+            Behavior on opacity{ NumberAnimation { easing.type: Easing.InOutQuint; duration: 300 } }
+        }
+
+        Shape {
+            id: arrow
+
+            width: messageBox.width/10
+            height: messageBox.height/4
+
+            opacity: 0;
+            scale: 0;
+
+            x: (messageBox.width-arrow.width)/2;
+            y: (messageBox.height-arrow.height)/2 + ((messageBox.height-arrow.height))*arrow.scale;
+
+            ShapePath {
+                fillColor: "red"
+                strokeColor: "red"
+
+                startX: 0
+                startY: 0
+
+                PathLine { x: 0; y: 0 }
+                PathLine { x: arrow.width/2; y: arrow.height }
+                PathLine { x: arrow.width; y: 0 }
+            }
+
+            Behavior on scale{ NumberAnimation { easing.type: Easing.InOutCubic; duration: 300 } }
+            Behavior on opacity{ NumberAnimation { easing.type: Easing.InOutCubic; duration: 300 } }
+        }
+
         MyTranslator{
             id: translator
-
 
             onGetError: {
                 messageBox.state = "active"
                 errorOutput.text = text
 
-                errorRect.p = textInput.positionToRectangle(pos)
+                errorRect.p = textInput.positionToRectangle(pos);
+
                 errorRect.opacity = 0.3
             }
 
@@ -199,38 +297,38 @@ float x = s[0];"
         states: [
             State {
                 name: "active"
-                PropertyChanges { target: messageBox; opacity: 0.6; y: window.height - messageBox.height + 5}
+                PropertyChanges { target: messageBox; opacity: 0.8; scale: 1;}
             },
             State {
                 name: "passive"
-                PropertyChanges { target: messageBox; opacity: 0; y: window.height + messageBox.height + 5}
+                PropertyChanges { target: messageBox; opacity: 0; scale: 0.9;}
             }
         ]
 
         transitions: [
             Transition {
-                from: "active"
                 to: "passive"
-                OpacityAnimator{ target: messageBox; duration: 1000; easing.type: Easing.InOutCirc}
-                PropertyAnimation { target: messageBox; property: "y"; duration: 1000; easing.type: Easing.InOutQuart}
+                PropertyAnimation { target: messageBox; property: "scale"; duration: 300; easing.type: Easing.InOutQuart}
+                OpacityAnimator{ target: messageBox; duration: 250; easing.type: Easing.InOutCirc}
             },
             Transition {
-                from: "passive"
                 to: "active"
+                PropertyAnimation { target: messageBox; property: "scale"; duration: 300; easing.type: Easing.InOutQuart}
                 OpacityAnimator{ target: messageBox; duration: 250; easing.type: Easing.InOutQuad}
-                PropertyAnimation { target: messageBox; property: "y"; duration: 250; easing.type: Easing.InOutQuad}
             }
         ]
 
         Text{
             id: errorOutput
+
+            width: 400
+
             color: "black"
 
             wrapMode: Text.Wrap
 
             font.pointSize: 12
-            anchors.fill: parent
-            anchors.margins: 5
+            anchors.centerIn: parent
         }
     }
 }

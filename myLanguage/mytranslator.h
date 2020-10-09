@@ -66,7 +66,7 @@ public:
 
     Q_INVOKABLE QVariantList getHidenEdges(int FigureID) const;
 
-    void throwError(QString text);
+    void throwError(QString text, int s_pos = -1);
 
     Q_INVOKABLE bool getDraw() const;
 private:
@@ -85,7 +85,6 @@ private:
 
     bool operation();
 
-    bool initVariable();
     bool getVariable();
     bool varName();
 

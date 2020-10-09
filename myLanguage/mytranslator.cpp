@@ -32,16 +32,19 @@ bool MyTranslator::getDraw() const{
     return draw;
 }
 
-void MyTranslator::throwError(QString text){
-    int idx = 0;
-    int i = word - inputData.begin();
+void MyTranslator::throwError(QString text, int s_pos){
+    int    idx = 0,
+            //i = (s_pos!=-1)?s_pos:(word - inputData.begin());
+            i = word - inputData.begin();
+
+    QList<QChar> dic{' ','\n','\t'};
+
+    while (dic.contains(store[idx])) idx++;
 
     for (; i > 0; i--){
          idx += (*(word - i)).length();
-         while (store[idx+1] == " " || store[idx+1] == "\n") idx++;
+         while (dic.contains(store[idx])) idx++;
     }
-
-    while (store[idx] == " " || store[idx] == "\n") idx++;
 
     emit getError(text, idx);
 }
@@ -130,28 +133,22 @@ bool MyTranslator::varName(){
     return true;
 }
 
-bool MyTranslator::initVariable(){
-    if (!next()){
-        throwError("после '"+*word+"' должно было быть имя переменной");
-        return false;
-    }
-    if (!varName()) return false;
-
-    if (ObjList.contains(*word)){
-        throwError("переменная " + *word + " уже обьявлена");
-        return false;
-    }
-
-    ObjList.insert(*word, {*(word-1), QVariant()});
-
-    return true;
-}
-
 bool MyTranslator::operation(){
     if (is("figure") || is("float") || is("vector") || is("point") || is("var")){
-        if (!initVariable()) return false;
+        if (!next()){
+            throwError("после '"+*word+"' должно было быть имя переменной");
+            return false;
+        }
+        if (!varName()) return false;
 
-        auto &obj = ObjList[*word];
+        QString initVar = *word;
+
+        if (ObjList.contains(initVar)){
+            throwError("переменная " + CutWord(initVar) + " уже обьявлена");
+            return false;
+        }
+
+        t_Variable obj;
         obj.type = *(word-1);
 
         if (is("=",1)){
@@ -159,14 +156,17 @@ bool MyTranslator::operation(){
             if (next()){
                 if (!rightPart(obj)) return false;
             }else{
-                throwError("после знака '=' должно быть значение с типом '"+obj.type+"'");
+                if (obj.type == "var") throwError("после знака '=' должно быть объявлено новое значение");
+                else throwError("после знака '=' должно быть объявлено новое значение с типом '"+obj.type+"'");
+
                 return false;
             }
-        }else if (word+1 == inputData.end()){
+        }else if (!is(";",1)){
             throwError("после '"+CutWord(*word)+"' должно быть ';' или '='");
             return false;
         }
 
+        ObjList.insert(initVar, obj);
     }else if (is("rotate")){
         if (!is("(",1)){
             throwError("после слова '"+*word+"' должна быть открывающая скобка '('");
@@ -625,9 +625,13 @@ bool MyTranslator::rightPart(t_Variable &result){
     bool minus = false;
     QString outputType = result.type;
 
+    int s_pos = word-inputData.begin();
+
     if (is("-")){
         minus = true;
         if (!next()) return false;
+    }else if (is("+")){
+        word++;
     }
 
     if (!block(result)) return false;
@@ -653,13 +657,14 @@ bool MyTranslator::rightPart(t_Variable &result){
     while(is("+",1) || is("-",1)){
         if (is("+",1)){
             if (!next(2)) return false;
+
             if (!block(tmp)) return false;
 
             if (result.type == "float"){
                 if (tmp.type == "float"){
                     result.value.setValue(result.value.toFloat()+tmp.value.toFloat());
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
+                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
                     return false;
                 }
             }else if (result.type == "point"){
@@ -684,7 +689,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(figure);
                     result.type = "figure";
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
+                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
                     return false;
                 }
             }else if (result.type == "vector"){
@@ -705,7 +710,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
+                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
                     return false;
                 }
             }else if (result.type == "figure"){
@@ -728,8 +733,8 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(figure);
                 }else if (tmp.type == "figure"){
                     t_Figure res,
-                            A = tmp.value.value<t_Figure>(),
-                            B = result.value.value<t_Figure>();
+                            B = tmp.value.value<t_Figure>(),
+                            A = result.value.value<t_Figure>();
 
                     QList<QPointF> &Af = A.data, &Bf = B.data, &Rf = res.data;
 
@@ -762,7 +767,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                         QPointF v;
 
                         int8_t stepA,stepB;
-                        int i,j;
+                        int i,j,pv;
 
                         uint8_t state = 0;
 
@@ -800,6 +805,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                             continue;
                                         }else{
+                                            // проверка, что уже не обходили частично эту часть фигуры
+
                                             for (i = range.first; i < range.second; i++){
                                                 if (table.contains(Af[i])){
                                                     if (table[Af[i]].visited){
@@ -808,7 +815,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                     }
                                                 }
                                             }
-                                            if (i < range.second) continue;
+                                            if (i != range.second) continue;
                                         }
 
                                         break;
@@ -816,20 +823,35 @@ bool MyTranslator::rightPart(t_Variable &result){
                                 }
 
                                 if (startPos != -1){
-                                    Rf<<Af[startPos];
+                                    i=startPos;
 
-                                    if (A.jumps.contains(startPos)) A.jumps[startPos].visited = true;
-                                    v = normalizedVector(Af[startPos+1]-Af[startPos]);
-                                    stepA = isInside(Af[startPos]+v,B,true)?-1:1;
+                                    Rf<<Af[i];
 
-                                    i = startPos+stepA;
+                                    pv = i;
+                                    if (A.transition.contains(pv)){
+                                        if ((pv - A.transition[pv]) > 0){
+                                            pv = A.transition[pv];
+                                        }
+                                    }
+                                    pv++;
 
-                                    if (A.jumps.contains(startPos)) A.jumps[startPos].visited = true;
-                                    if (A.transition.contains(startPos)) {
-                                        if ((startPos - A.transition[startPos])*stepA > 0){
-                                            i = A.transition[startPos]+stepA;
+                                    v = normalizedVector(Af[pv]-Af[i]);
+                                    stepA = isInside(Af[i]+v,B,true)?-1:1;
+
+                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                    if (A.transition.contains(i)) {
+                                        if ((i - A.transition[i])*stepA > 0){
+                                            i = A.transition[i];
                                             if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         }
+                                    }
+
+                                    i+=stepA;
+
+                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                    if (A.transition.contains(i)) {
+                                        i = A.transition[i];
+                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     }
 
                                     Rf << Af[i];
@@ -842,20 +864,28 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                 table[Af[i]].visited = true;
 
                                                 pc = table[Af[i]];
-                                                v = normalizedVector(Bf[pc.B_idx + 1]-Af[i]);
-                                                stepB = isInside(Af[i]+v,A,true)?-1:1;
+                                                j = pc.B_idx;
 
-                                                if (B.jumps.contains(pc.B_idx)) B.jumps[pc.B_idx].visited = true;
+                                                pv = j;
+                                                if (B.transition.contains(pv)){
+                                                    if (pc.B_idx > B.transition[pc.B_idx]){
+                                                        pv = B.transition[pv];
+                                                    }
+                                                }
+                                                pv++;
 
-                                                j = pc.B_idx+stepB;
+                                                v = normalizedVector(Bf[pv]-Bf[j]);
+                                                stepB = isInside(Bf[j]+v,A,true)?-1:1;
 
                                                 if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                 if (B.transition.contains(pc.B_idx)) {
                                                     if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
-                                                        j = B.transition[pc.B_idx]+stepB;
+                                                        j = B.transition[pc.B_idx];
                                                         if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                     }
                                                 }
+
+                                                j+=stepB;
 
                                                 if (B.transition.contains(j)) {
                                                     j = B.transition[j];
@@ -910,10 +940,9 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                     Rf << Rf[0];
                                 }
+
+                                if (Rf.back() != Rf.first()) Rf << Rf[0];
                             }while(startPos != -1);
-
-
-
 
                             state++;
 
@@ -928,7 +957,7 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     result.value.setValue(res);
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
+                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
                     return false;
                 }
             }
@@ -1196,7 +1225,7 @@ bool MyTranslator::rightPart(t_Variable &result){
 
     if (!outputType.isEmpty()){
         if (result.type != outputType && outputType != "var"){
-            throwError("нельзя преобразовать '" + result.type + "' в '"+ outputType +"'");
+            throwError("нельзя преобразовать '" + result.type + "' в '"+ outputType +"'",s_pos);
             return false;
         }
     }
@@ -1475,7 +1504,7 @@ bool MyTranslator::getFigure(t_Variable &result){
     while (is(",",1)){
         word++;
         if (!next()){
-            throwError("после запятой должна быть обьект типа 'point'");
+            throwError("после запятой должен быть обьект типа 'point'");
             return false;
         }
         if (varName()){
@@ -1563,6 +1592,12 @@ bool MyTranslator::part(t_Variable &result){
             return false;
         }
 
+        if (is(")")){
+            if (result.type == "var") throwError("внутри круглых скобок ожидалось выражение");
+            else throwError("внутри круглых скобок ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'");
+            return false;
+        }
+
         t_Variable tmp;
 
         if (result.type == "point"){
@@ -1572,8 +1607,8 @@ bool MyTranslator::part(t_Variable &result){
         if (!rightPart(tmp)) return false;
 
         if (!next()) {
-            if (result.type == "point") throwError("после '"+*word+"' должна быть запятая");
-            else throwError("после '" + *word + "' должна быть круглая скобка");
+            if (result.type == "point") throwError("после '"+CutWord(*word)+"' должна быть запятая");
+            else throwError("после '" + CutWord(*word) + "' должна быть круглая скобка");
             return false;
         }
 
@@ -1593,7 +1628,7 @@ bool MyTranslator::part(t_Variable &result){
              result.type = "point";
 
              if (!next()) {
-                 throwError("после '" + *word + "' должна быть круглая скобка");
+                 throwError("после '" + CutWord(*word) + "' должна быть круглая скобка");
                  return false;
              }
         }else{
@@ -1635,7 +1670,7 @@ bool MyTranslator::part(t_Variable &result){
 
 bool MyTranslator::getFloatOnPoint(t_Variable &result){
     if (is("[",1)){
-        next();
+        word++;
 
         if (!next()){
             throwError("введите индекс");
@@ -1673,7 +1708,7 @@ bool MyTranslator::getFloatOnPoint(t_Variable &result){
 
 bool MyTranslator::getPointOnFigure(t_Variable &result){
     if (is("[",1)){
-        next();
+        word++;
 
         if (!next()){
             throwError("введите индекс");
