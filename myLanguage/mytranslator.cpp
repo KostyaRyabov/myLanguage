@@ -187,6 +187,9 @@ bool MyTranslator::operation(){
         }else if (!is(";",1)){
             throwError("после '"+CutWord(*word)+"' должно быть ';' или '='");
             return false;
+        }else if (obj.type == "var"){
+            throwError("динамическая переменная '"+CutWord(initVar)+"' не может быть неинициализированной");
+            return false;
         }
 
         ObjList.insert(initVar, obj);
@@ -317,6 +320,8 @@ bool MyTranslator::operation(){
         t_Variable result = ObjList[var];
         t_Figure figure;
 
+        t_Variable tmp;
+
         if (result.type == "figure"){
             figure = result.value.value<t_Figure>();
 
@@ -325,38 +330,52 @@ bool MyTranslator::operation(){
                     word++;
                     property << *word;
 
+                    tmp.type = "color";
+
                     if (is("Red",1) || is("Green",1) || is("Blue",1) || is("Alpha",1)){
                         word++;
                         property << *word;
+
+                        tmp.type = "float";
                     }else if (!is("=",1) && !is(";",1)){
                         word++;
                         throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nRed, Green, Blue, Alpha");
                         return false;
                     }
-                }else if (is("StrokeWidth",1) || is("DotRadius")){
+                }else if (is("StrokeWidth",1) || is("DotRadius",1)){
                     word++;
                     property << *word;
+
+                    tmp.type = "float";
+                }else if (is("Red",1) || is("Green",1) || is("Blue",1) || is("Alpha",1)){
+                    word++;
+                    property << *word;
+
+                    tmp.type = "float";
                 }else{
                     word++;
                     throwError("у фигур нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nFillColor, StrokeColor, DotColor, StrokeWidth, DotRadius");
                     return false;
                 }
             }
+        }else if (is("Red",1) || is("Green",1) || is("Blue",1) || is("Alpha",1)){
+            word++;
+            property << *word;
+
+            tmp.type = "float";
         }
+
 
         if (is("=",1)){
             word++;
-            if (next()){
-                t_Variable tmp;
 
+            if (next()){
                 if (property.size() == 2){
                     QColor *color;
-
                     if (property.first() == "FillColor") color = &figure.FillColor;
                     else if (property.first() == "StrokeColor") color = &figure.StrokeColor;
                     else if (property.first() == "DotColor") color = &figure.DotColor;
 
-                    t_Variable tmp;
                     tmp.type = "float";
                     if (!rightPart(tmp)) return false;
 
@@ -367,49 +386,43 @@ bool MyTranslator::operation(){
 
                     result.value.setValue(figure);
                 }else if (property.size() == 1){
-                    if (property.first() == "FillColor"){
-                        tmp.type = "color";
-                        tmp.value.setValue(figure.FillColor);
-                    }else if (property.first() == "StrokeColor"){
-                        tmp.type = "color";
-                        tmp.value.setValue(figure.StrokeColor);
-                    }else if (property.first() == "DotColor"){
-                        tmp.type = "color";
-                        tmp.value.setValue(figure.DotColor);
-                    }else if (property.first() == "DotRadius"){
-                        tmp.type = "float";
-                        tmp.value.setValue(figure.DotRadius);
-                    }else if (property.first() == "StrokeWidth"){
-                        tmp.type = "float";
-                        tmp.value.setValue(figure.StrokeWidth);
-                    }
+                    QColor color;
+                    if (result.type == "color") color = result.value.value<QColor>();
+
+                    if (property.first() == "FillColor")                   tmp.value.setValue(figure.FillColor);
+                    else if (property.first() == "StrokeColor")     tmp.value.setValue(figure.StrokeColor);
+                    else if (property.first() == "DotColor")          tmp.value.setValue(figure.DotColor);
+                    else if (property.first() == "DotRadius")        tmp.value.setValue(figure.DotRadius);
+                    else if (property.first() == "StrokeWidth")    tmp.value.setValue(figure.StrokeWidth);
 
                     if (!rightPart(tmp)) return false;
 
-                    if (property.first() == "FillColor"){
-                        figure.FillColor = tmp.value.value<QColor>();
-                    }else if (property.first() == "StrokeColor"){
-                        figure.StrokeColor = tmp.value.value<QColor>();
-                    }else if (property.first() == "DotColor"){
-                        figure.DotColor = tmp.value.value<QColor>();
-                    }else if (property.first() == "DotRadius"){
-                        figure.DotRadius = tmp.value.toFloat();
-                    }else if (property.first() == "StrokeWidth"){
-                        figure.StrokeWidth = tmp.value.toFloat();
-                    }
+                    if (property.first() == "FillColor")                  figure.FillColor = tmp.value.value<QColor>();
+                    else if (property.first() == "StrokeColor")    figure.StrokeColor = tmp.value.value<QColor>();
+                    else if (property.first() == "DotColor")         figure.DotColor = tmp.value.value<QColor>();
+                    else if (property.first() == "DotRadius")       figure.DotRadius = tmp.value.toFloat();
+                    else if (property.first() == "StrokeWidth")   figure.StrokeWidth = tmp.value.toFloat();
+                    else if (property.last()  == "Red")                 color.setRedF(tmp.value.toFloat());
+                    else if (property.last()  == "Green")              color.setGreenF(tmp.value.toFloat());
+                    else if (property.last()  == "Blue")                color.setBlueF(tmp.value.toFloat());
+                    else if (property.last()  == "Alpha")              color.setAlphaF(tmp.value.toFloat());
 
-                    result.value.setValue(figure);
+                    if (result.type == "color") result.value.setValue(color);
+                    else result.value.setValue(figure);
                 }else{
                     if (!rightPart(result)) return false;
                 }
 
                 ObjList[var] = result;
             }else{
-                throwError("после знака '=' должно быть присваемое значение типа '"+result.type+"'");
+                throwError("после знака '=' должно быть присваемое значение типа '"+tmp.type+"'");
                 return false;
             }
         }else{
-            throwError("после слова '"+CutWord(*word)+"' должен быть знак '='");
+            if (result.type == "color" && property.isEmpty()) throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров цвета: Red, Green, Blue, Alpha");
+            else throwError("после слова '"+CutWord(*word)+"' должен быть знак '='");
+
+
             return false;
         }
     }else return false;
@@ -1829,7 +1842,7 @@ bool MyTranslator::part(t_Variable &result){
         }
 
         if (!is("]",1)){
-            throwError("после '" + *word + "' должна быть закрывающая квадратная скобка");
+            throwError("после " + *word + "должна быть закрывающая квадратная скобка");
             return false;
         }
         word++;

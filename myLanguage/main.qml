@@ -121,13 +121,9 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "color c = [1,2,3,4];"
-
                 placeholderText: qsTr("Введите команду...")
 
-                onTextChanged: {
-                    translator.read(textInput.text)
-                }
+                onTextChanged: translator.read(textInput.text)
 
                 anchors.margins: 10
                 wrapMode: TextEdit.Wrap
@@ -155,10 +151,10 @@ Window {
             }
 
             onYChanged: {
-                newY = errorRect.y+messageBox.height/2+10;
+                newY = errorRect.y+errorRect.height+10;
 
                 if (newY < 20) {
-                    arrow.opacity = 0.8;
+                    arrow.opacity = 1;
                     arrow.scale = -1;
 
                     pointer.opacity = 0;
@@ -167,7 +163,7 @@ Window {
                     newY = 20;
                 } else if (newY+messageBox.height > codeArea.height-errorRect.height) {
                     if (codeArea.height <= errorRect.y+errorRect.height){
-                        arrow.opacity = 0.8;
+                        arrow.opacity = 1;
                         arrow.scale = 1;
 
                         pointer.opacity = 0;
@@ -175,7 +171,7 @@ Window {
 
                         newY = codeArea.height-messageBox.height-errorRect.height;
                     }else{
-                        pointer.opacity = 0.8;
+                        pointer.opacity = 1;
                         pointer.scale = 1;
 
                         arrow.scale = 0;
@@ -184,7 +180,7 @@ Window {
                         newY = errorRect.y - messageBox.height-5;
                     }
                 }else {
-                    pointer.opacity = 0.8;
+                    pointer.opacity = 1;
                     pointer.scale = -1;
 
                     arrow.scale = 0;
@@ -214,7 +210,7 @@ Window {
         width: errorOutput.width+10
         height: errorOutput.height+10
 
-        color: "red"
+        color: "#f44848"
 
         radius: 3
 
@@ -232,8 +228,8 @@ Window {
             y: (messageBox.height-pointer.height)/2 + ((messageBox.height+pointer.height)/2)*pointer.scale;
 
             ShapePath {
-                fillColor: "red"
-                strokeColor: "red"
+                fillColor: "#f44848"
+                strokeColor: "#f44848"
 
                 startX: 0
                 startY: 0
@@ -260,8 +256,8 @@ Window {
             y: (messageBox.height-arrow.height)/2 + ((messageBox.height-arrow.height))*arrow.scale;
 
             ShapePath {
-                fillColor: "red"
-                strokeColor: "red"
+                fillColor: "#f44848"
+                strokeColor: "#f44848"
 
                 startX: 0
                 startY: 0
@@ -297,7 +293,7 @@ Window {
         states: [
             State {
                 name: "active"
-                PropertyChanges { target: messageBox; opacity: 0.8; scale: 1;}
+                PropertyChanges { target: messageBox; opacity: 1; scale: 1;}
             },
             State {
                 name: "passive"
