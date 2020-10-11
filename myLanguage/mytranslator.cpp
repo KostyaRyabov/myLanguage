@@ -33,16 +33,17 @@ bool MyTranslator::getDraw() const{
 }
 
 void MyTranslator::throwError(QString text, int s_pos){
+    QList<QString>::iterator iter = inputData.begin();
+
     int    idx = 0,
-            //i = (s_pos!=-1)?s_pos:(word - inputData.begin());
-            i = word - inputData.begin();
+            n = ((s_pos!=-1)?s_pos:(word - iter));
 
     QList<QChar> dic{' ','\n','\t'};
 
     while (dic.contains(store[idx])) idx++;
 
-    for (; i > 0; i--){
-         idx += (*(word - i)).length();
+    for (int i = 0; i < n; i++){
+         idx += (*(iter + i)).length();
          while (dic.contains(store[idx])) idx++;
     }
 
@@ -69,8 +70,10 @@ QVariantList MyTranslator::getHidenEdges(int FigureID) const{
     QVariantList list;
     auto &figure = Figures[FigureID];
 
-    for (auto &jump : figure.jumps){
-        list << jump.idx+1;
+    if (figure.jumps.size() > 1){
+        for (auto &jump : figure.jumps){
+            list << jump.idx+1;
+        }
     }
 
     return list;
@@ -125,7 +128,7 @@ bool MyTranslator::varName(){
 
     for (uint16_t i = 1; i < (*word).size(); i++){
         if (!(*word)[i].isLetterOrNumber()){
-            throwError("в имени переменной могут быть только буквы и символы");
+            throwError("в имени переменной могут быть только буквы и цифры");
             return false;
         }
     }
@@ -158,7 +161,6 @@ bool MyTranslator::operation(){
             }else{
                 if (obj.type == "var") throwError("после знака '=' должно быть объявлено новое значение");
                 else throwError("после знака '=' должно быть объявлено новое значение с типом '"+obj.type+"'");
-
                 return false;
             }
         }else if (!is(";",1)){
@@ -330,8 +332,11 @@ bool MyTranslator::onSameLine(int i, QHash<int,int> &ranges){
     return false;
 }
 
-void MyTranslator::simpify(t_Figure &figure){
+bool MyTranslator::simplify(t_Figure &figure){
     if (figure.data.size() > 0){
+
+        bool changed = false;
+
         for (auto it = figure.data.begin()+1; it+1 != figure.data.end();){
             if (figure.jumps.contains(it - figure.data.begin())) {
                 it++;
@@ -340,6 +345,8 @@ void MyTranslator::simpify(t_Figure &figure){
 
             if (abs(it->x()-(it+1)->x()) <= EPS && abs(it->y()-(it+1)->y()) <= EPS){
                 it = figure.data.erase(it);
+                changed = true;
+
                 getFigureInfo(figure);
             }else if (onSameLine(it - figure.data.begin(), figure.transition) && abs(((it-1)->x()-(it+1)->x())*((it)->y()-(it+1)->y())-((it-1)->y()-(it+1)->y())*((it)->x()-(it+1)->x())) <= EPS){
                 if (figure.jumps.contains(it - figure.data.begin())) {
@@ -348,10 +355,16 @@ void MyTranslator::simpify(t_Figure &figure){
                 }
 
                 it = figure.data.erase(it);
+                changed = true;
+
                 getFigureInfo(figure);
             }else it++;
         }
+
+        return changed;
     }
+
+    return false;
 }
 
 QPointF MyTranslator::getCenter(t_Figure &figure){
@@ -371,7 +384,7 @@ QPointF MyTranslator::getCenter(t_Figure &figure){
 }
 
 bool MyTranslator::isFilledFigure(t_Figure &figure) const{
-    return (figure.data.size() > 1 && figure.data.first() == figure.data.back());
+    return (figure.data.first() == figure.data.back());
 }
 
 QPointF MyTranslator::normalizedVector(QPointF v){
@@ -453,6 +466,8 @@ int MyTranslator::getIdxOfMinPerpendicular(QPointF &point, t_Figure &figure, flo
 QList<QPointF> MyTranslator::IntersectionList(t_Figure &A, t_Figure &B){
     auto Af = A.data, Bf = B.data;
 
+    if (Af.isEmpty() || Bf.isEmpty()) return {};
+
     uint32_t size_A = Af.size()-1,
             size_B = Bf.size()-1;
 
@@ -502,7 +517,7 @@ int MyTranslator::Intersection(QPointF &A,QPointF &B,  t_Figure &figure){
 int MyTranslator::getIdxOfNearestEdge(QPointF &point, t_Figure &figure){
     int size = figure.data.size()-1, idx = -1;
     float min_dist = std::numeric_limits<float>::max(), cur_dist;
-    bool iff = isFilledFigure(figure);
+    bool iff = figure.data.size()>1;
 
     if (iff){
         if (isInside(point,figure)) return -1;
@@ -539,16 +554,18 @@ void MyTranslator::getFigureInfo(t_Figure &f) const{
     f.jumps.clear();
     f.transition.clear();
 
-    for (int i = 0; i < size; i++){
-        for (int j = i+1; j < size; j++){
-            if (i != j){
-                if (fig[i] == fig[j+1]) {
-                    if (fig[i+1] == fig[j]) {
-                        tmp.idx = i;
-                        f.jumps[i] = tmp;
+    if (f.data.size() > 3){
+        for (int i = 0; i < size; i++){
+            for (int j = i+1; j < size; j++){
+                if (i != j){
+                    if (fig[i] == fig[j+1]) {
+                        if (fig[i+1] == fig[j]) {
+                            tmp.idx = i;
+                            f.jumps[i] = tmp;
 
-                        tmp.idx = j;
-                        f.jumps[j] = tmp;
+                            tmp.idx = j;
+                            f.jumps[j] = tmp;
+                        }
                     }
                 }
             }
@@ -556,6 +573,11 @@ void MyTranslator::getFigureInfo(t_Figure &f) const{
     }
 
     if (f.jumps.isEmpty()){
+        Jump jump;
+        jump.idx = 0;
+
+        f.jumps[0] = jump;
+
         f.transition[0] = size;
         f.transition[size] = 0;
     }else{
@@ -670,7 +692,7 @@ bool MyTranslator::rightPart(t_Variable &result){
             }else if (result.type == "point"){
                 if (tmp.type == "point"){
                     t_Figure figure;
-                    figure.data = {result.value.toPointF(), tmp.value.toPointF()};
+                    figure.data = {result.value.toPointF(), tmp.value.toPointF(),result.value.toPointF()};
 
                     result.value.setValue(figure);
                     result.type = "figure";
@@ -778,6 +800,9 @@ bool MyTranslator::rightPart(t_Variable &result){
                         if (A.jumps.isEmpty()) A.jumps[0] = jump;
                         if (B.jumps.isEmpty()) B.jumps[0] = jump;
 
+                        getFigureInfo(A);
+                        getFigureInfo(B);
+
                         do{
                             do{
                                 startPos = -1;
@@ -805,8 +830,6 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                             continue;
                                         }else{
-                                            // проверка, что уже не обходили частично эту часть фигуры
-
                                             for (i = range.first; i < range.second; i++){
                                                 if (table.contains(Af[i])){
                                                     if (table[Af[i]].visited){
@@ -953,7 +976,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                     }
 
                     getFigureInfo(res);
-                    simpify(res);
+                    if (simplify(res)) getFigureInfo(res);
 
                     result.value.setValue(res);
                 }else{
@@ -1036,153 +1059,199 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     QList<QPointF> &Af = A.data, &Bf = B.data, &Rf = res.data;
 
-                    QList<QPointF> list = IntersectionList(A,B);
-                    QHash<QPointF, RowData> table;
+                    if (!Af.isEmpty()){
+                        QList<QPointF> list = IntersectionList(A,B);
+                        QHash<QPointF, RowData> table;
 
-                    uint32_t A_idx = 0, B_idx;
+                        uint32_t A_idx = 0, B_idx;
 
-                    for (auto &p : list){
-                        A_idx = getIdxOfMinPerpendicular(p, A);
-                        if (Af[A_idx] != p) Af.insert(A_idx,p);
-                        getFigureInfo(A);
+                        for (auto &p : list){
+                            A_idx = getIdxOfMinPerpendicular(p, A);
+                            if (Af[A_idx] != p) Af.insert(A_idx,p);
+                            getFigureInfo(A);
 
-                        B_idx = getIdxOfMinPerpendicular(p, B);
-                        if (Bf[B_idx] != p) Bf.insert(B_idx ,p);
-                        getFigureInfo(B);
-                    }
+                            B_idx = getIdxOfMinPerpendicular(p, B);
+                            if (Bf[B_idx] != p) Bf.insert(B_idx ,p);
+                            getFigureInfo(B);
+                        }
 
-                    int    A_size = Af.size()-1,
-                            B_size = Bf.size()-1;
+                        int    A_size = Af.size()-1,
+                                B_size = Bf.size()-1;
 
-                    for (int i = 0;i < A_size;i++) if (list.contains(Af[i])) table[Af[i]].A_idx = i;
-                    for (int i = 0;i < B_size;i++) if (list.contains(Bf[i])) table[Bf[i]].B_idx = i;
+                        for (int i = 0;i < A_size;i++) if (list.contains(Af[i])) table[Af[i]].A_idx = i;
+                        for (int i = 0;i < B_size;i++) if (list.contains(Bf[i])) table[Bf[i]].B_idx = i;
 
-                    RowData pc;
+                        RowData pc;
 
-                    int startPos;
+                        int startPos;
 
-                    {
-                        QPointF v;
+                        {
+                            QPointF v;
 
-                        int8_t stepA,stepB;
-                        int i,j;
+                            int8_t stepA,stepB;
+                            int i,j,pv;
 
-                        Jump jump;
-                        jump.idx = 0;
-                        jump.visited = false;
+                            Jump jump;
+                            jump.idx = 0;
+                            jump.visited = false;
 
-                        if (A.jumps.isEmpty()) A.jumps[0] = jump;
-                        if (B.jumps.isEmpty()) B.jumps[0] = jump;
+                            if (A.jumps.isEmpty()) A.jumps[0] = jump;
+                            if (B.jumps.isEmpty()) B.jumps[0] = jump;
 
-                        do{
-                            startPos = -1;
+                            getFigureInfo(A);
+                            getFigureInfo(B);
 
-                            for (auto &cross_point : table){
-                                if (!cross_point.visited){
-                                    startPos = cross_point.A_idx;
+                            do{
+                                startPos = -1;
 
-                                    v = normalizedVector(Af[startPos+1]-Af[startPos]);
-                                    stepA = isInside(Af[startPos]+v,B,true)?-1:1;
+                                for (auto &cross_point : table){
+                                    if (!cross_point.visited){
+                                        startPos = cross_point.A_idx;
 
-                                    if (A.transition.contains(startPos)) {
-                                        if ((startPos - A.transition[startPos])*stepA > 0){
-                                            startPos = A.transition[startPos]+stepA;
+                                        for (auto &jump : A.jumps){
+                                            auto range = getRange(jump.idx,A.transition);
+
+                                            if (range.first < startPos && startPos < range.second){
+                                                jump.visited = true;
+
+                                                for (i = range.first; i < range.second; i++){
+                                                    if (!isInside(Af[i],B)) break;
+                                                }
+
+                                                if (i == range.second) startPos = -1;
+
+                                                break;
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+
+                                if (startPos == -1){
+                                    for (auto &jump : A.jumps){
+                                        if (!jump.visited){
+                                            jump.visited = true;
+                                            auto range = getRange(jump.idx,A.transition);
+
+                                            for (i = range.first; i < range.second; i++){
+                                                if (!isInside(Af[i],B) && !table.contains(Af[i])){
+                                                    startPos = i;
+                                                    break;
+                                                }
+                                            }
+
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (startPos != -1){
+                                    i=startPos;
+
+                                    Rf<<Af[i];
+
+                                    pv = i;
+                                    if (A.transition.contains(pv)){
+                                        if ((pv - A.transition[pv]) > 0){
+                                            pv = A.transition[pv];
+                                        }
+                                    }
+                                    pv++;
+
+                                    v = normalizedVector(Af[pv]-Af[i]);
+                                    stepA = isInside(Af[i]+v,B,true)?-1:1;
+
+                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                    if (A.transition.contains(i)) {
+                                        if ((i - A.transition[i])*stepA > 0){
+                                            i = A.transition[i];
                                             if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         }
                                     }
 
-                                    break;
-                                }
-                            }
+                                    i+=stepA;
 
-                            if (startPos == -1){
-                                for (auto &jump : A.jumps){
-                                    if (!jump.visited){
-                                        jump.visited = true;
-                                        auto range = getRange(jump.idx,A.transition);
-
-                                        for (i = range.first; i < range.second; i++){
-                                            if (!isInside(Af[i],B) && !table.contains(Af[i])){
-                                                startPos = i;
-                                                break;
-                                            }
-                                        }
-
-                                        break;
-                                    }
-                                }
-                            }
-
-                            if (startPos != -1){
-                                Rf<<Af[startPos];
-
-                                if (A.jumps.contains(startPos)) A.jumps[startPos].visited = true;
-                                v = normalizedVector(Af[startPos+1]-Af[startPos]);
-                                stepA = isInside(Af[startPos]+v,B,true)?-1:1;
-
-                                i = startPos+stepA;
-
-                                if (A.jumps.contains(startPos)) A.jumps[startPos].visited = true;
-                                if (A.transition.contains(startPos)) {
-                                    if ((startPos - A.transition[startPos])*stepA > 0){
-                                        i = A.transition[startPos]+stepA;
+                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                    if (A.transition.contains(i)) {
+                                        i = A.transition[i];
                                         if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     }
-                                }
 
-                                Rf << Af[i];
+                                    Rf << Af[i];
 
-                                for (;;) {
-                                    if (list.contains(Af[i])){
-                                        if (table[Af[i]].visited){
-                                            break;
-                                        }else{
-                                            table[Af[i]].visited = true;
+                                    for (;;) {
+                                        if (list.contains(Af[i])){
+                                            if (table[Af[i]].visited){
+                                                break;
+                                            }else{
+                                                table[Af[i]].visited = true;
 
-                                            pc = table[Af[i]];
-                                            v = normalizedVector(Bf[pc.B_idx + 1]-Af[i]);
-                                            stepB = isInside(Af[i]+v,A,true)?1:-1;
+                                                pc = table[Af[i]];
+                                                j = pc.B_idx;
 
-                                            if (B.jumps.contains(pc.B_idx)) B.jumps[pc.B_idx].visited = true;
-
-                                            j = pc.B_idx+stepB;
-
-                                            if (B.jumps.contains(j)) B.jumps[j].visited = true;
-                                            if (B.transition.contains(pc.B_idx)) {
-                                                if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
-                                                    j = B.transition[pc.B_idx]+stepB;
-                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
+                                                pv = j;
+                                                if (B.transition.contains(pv)){
+                                                    if (pc.B_idx > B.transition[pc.B_idx]){
+                                                        pv = B.transition[pv];
+                                                    }
                                                 }
-                                            }
+                                                pv++;
 
-                                            if (B.transition.contains(j)) {
-                                                j = B.transition[j];
+                                                v = normalizedVector(Bf[pv]-Bf[j]);
+                                                stepB = isInside(Bf[j]+v,A,true)?1:-1;
+
                                                 if (B.jumps.contains(j)) B.jumps[j].visited = true;
-                                            }
-
-                                            Rf << Bf[j];
-
-                                            for (;;) {
-                                                if (list.contains(Bf[j])){
-                                                    table[Bf[j]].visited = true;
-                                                    i = table[Bf[j]].A_idx;
-                                                    break;
+                                                if (B.transition.contains(pc.B_idx)) {
+                                                    if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
+                                                        j = B.transition[pc.B_idx];
+                                                        if (B.jumps.contains(j)) B.jumps[j].visited = true;
+                                                    }
                                                 }
 
                                                 j+=stepB;
 
-                                                if (B.jumps.contains(j)) B.jumps[j].visited = true;
-
-                                                Rf << Bf[j];
-
-                                                if (B.transition.contains(j)){
+                                                if (B.transition.contains(j)) {
                                                     j = B.transition[j];
                                                     if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                 }
+
+                                                Rf << Bf[j];
+
+                                                for (;;) {
+                                                    if (list.contains(Bf[j])){
+                                                        table[Bf[j]].visited = true;
+                                                        i = table[Bf[j]].A_idx;
+                                                        break;
+                                                    }
+
+                                                    j+=stepB;
+
+                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
+
+                                                    Rf << Bf[j];
+
+                                                    if (B.transition.contains(j)){
+                                                        j = B.transition[j];
+                                                        if (B.jumps.contains(j)) B.jumps[j].visited = true;
+                                                    }
+                                                }
+                                            }
+
+                                            if (i == startPos) break;
+
+                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                            if (A.transition.contains(i)){
+                                                i = A.transition[i];
+                                                if (A.jumps.contains(i)) A.jumps[i].visited = true;
+                                                if (i == startPos) break;
                                             }
                                         }
 
+                                        i+=stepA;
+
                                         if (i == startPos) break;
+
+                                        Rf << Af[i];
 
                                         if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         if (A.transition.contains(i)){
@@ -1192,27 +1261,16 @@ bool MyTranslator::rightPart(t_Variable &result){
                                         }
                                     }
 
-                                    i+=stepA;
-
-                                    Rf << Af[i];
-
-                                    if (i == startPos) break;
-
-                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
-                                    if (A.transition.contains(i)){
-                                        i = A.transition[i];
-                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
-                                        if (i == startPos) break;
-                                    }
+                                    Rf << Rf[0];
                                 }
 
-                                Rf << Rf[0];
-                            }
-                        }while(startPos != -1);
-                    }
+                                if (!Rf.isEmpty()) if (Rf.back() != Rf.first()) Rf << Rf.first();
+                            }while(startPos != -1);
+                        }
 
-                    getFigureInfo(res);
-                    simpify(res);
+                        getFigureInfo(res);
+                        if (simplify(res)) getFigureInfo(res);
+                    }
 
                     result.value.setValue(res);
                 }else{
@@ -1486,17 +1544,8 @@ bool MyTranslator::getFigure(t_Variable &result){
 
     t_Variable tmp;
 
-    if (varName()){
-        tmp = ObjList[*word];
-
-        if (tmp.type != "point"){
-            throwError("нельзя преобразовать '"+tmp.type+"' в 'point'");
-            return false;
-        }
-    }else{
-        tmp.type = "point";
-        if (!rightPart(tmp)) return false;
-    }
+    tmp.type = "point";
+    if (!rightPart(tmp)) return false;
 
     t_Figure tmp_fig;
     tmp_fig.data << tmp.value.toPointF();
@@ -1507,17 +1556,9 @@ bool MyTranslator::getFigure(t_Variable &result){
             throwError("после запятой должен быть обьект типа 'point'");
             return false;
         }
-        if (varName()){
-            tmp = ObjList[*word];
 
-            if (tmp.type != "point"){
-                throwError("нельзя преобразовать '"+tmp.type+"' в 'point'");
-                return false;
-            }
-        }else{
-            tmp.type = "point";
-            if (!rightPart(tmp)) return false;
-        }
+        tmp.type = "point";
+        if (!rightPart(tmp)) return false;
 
         tmp_fig.data << tmp.value.toPointF();
     }
@@ -1528,7 +1569,8 @@ bool MyTranslator::getFigure(t_Variable &result){
     }
     word++;
 
-    getFigureInfo(tmp_fig);
+    if (!isFilledFigure(tmp_fig) && tmp_fig.data.size() > 1) tmp_fig.data << tmp_fig.data.first();
+
     result.value.setValue(tmp_fig);
     result.type = "figure";
 
@@ -1554,7 +1596,10 @@ bool MyTranslator::getVector(t_Variable &result){
     t_Variable tmp;
 
     tmp.type = "float";
-    if (!rightPart(tmp)) return false;
+    if (!rightPart(tmp)) {
+        throwError("после открывающей квадратной скобки должен быть обьект типа 'float'");
+        return false;
+    }
 
     if (!is(",",1)) {
         throwError("после '"+*word+"' должна быть запятая");
@@ -1570,7 +1615,10 @@ bool MyTranslator::getVector(t_Variable &result){
      QPointF tmp_point;
      tmp_point.setX(tmp.value.toFloat());
 
-     if (!rightPart(tmp)) return false;
+     if (!rightPart(tmp)) {
+         throwError("после открывающей квадратной скобки должен быть обьект типа 'float'");
+         return false;
+     }
 
      if (!is("]",1)){
          throwError("после " + *word + "должна быть закрывающая квадратная скобка");
@@ -1587,28 +1635,28 @@ bool MyTranslator::getVector(t_Variable &result){
 
 bool MyTranslator::part(t_Variable &result){
     if (is("(")){
+        int s_pos = word - inputData.begin();
+
         if (!next()){
-            throwError("после '(' должно быть выражение");
+            if (result.type == "var") throwError("после открывающейся круглой скобоки ожидалось выражение",s_pos);
+            else throwError("после открывающейся круглой скобоки ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'",s_pos);
             return false;
         }
 
         if (is(")")){
-            if (result.type == "var") throwError("внутри круглых скобок ожидалось выражение");
-            else throwError("внутри круглых скобок ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'");
+            if (result.type == "var") throwError("внутри круглых скобок ожидалось выражение",s_pos);
+            else throwError("внутри круглых скобок ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'",s_pos);
             return false;
         }
 
         t_Variable tmp;
 
-        if (result.type == "point"){
-            tmp.type = "float";
-        }
-
+        if (result.type == "point") tmp.type = "float";
         if (!rightPart(tmp)) return false;
 
         if (!next()) {
             if (result.type == "point") throwError("после '"+CutWord(*word)+"' должна быть запятая");
-            else throwError("после '" + CutWord(*word) + "' должна быть круглая скобка");
+            else throwError("после '" + CutWord(*word) + "' должна быть закрывающаяся круглая скобка");
             return false;
         }
 
@@ -1628,7 +1676,7 @@ bool MyTranslator::part(t_Variable &result){
              result.type = "point";
 
              if (!next()) {
-                 throwError("после '" + CutWord(*word) + "' должна быть круглая скобка");
+                 throwError("после '" + CutWord(*word) + "' должна быть закрывающаяся круглая скобка");
                  return false;
              }
         }else{
@@ -1637,13 +1685,14 @@ bool MyTranslator::part(t_Variable &result){
         }
 
         if (!is(")")){
-            throwError("после '" + *(word-1) + "' должна быть круглая скобка");
+            throwError("после '" + *(word-1) + "' должна быть закрывающаяся круглая скобка");
             return false;
         }
 
         if (result.type == "point") return getFloatOnPoint(result);
-    }else if (is(";")){
-        throwError("после знака '=' должно быть новое значение типа '"+result.type+"'");
+    }else if (is("}") || is(")") || is("]") || is(";")){
+        if (result.type == "var") throwError("после '" +*(word-1)+ "' ожидалось выражение");
+        else throwError("после '" +*(word-1)+ "' ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'");
         return false;
     }else if (is("{")){
         if (!getFigure(result)) return false;
@@ -1679,8 +1728,10 @@ bool MyTranslator::getFloatOnPoint(t_Variable &result){
 
         t_Variable tmp;
         tmp.type = "float";
-
-        if (!rightPart(tmp)) return false;
+        if (!rightPart(tmp)) {
+            throwError("внутри квадратных скобок должен быть обьект типа 'float'");
+            return false;
+        }
 
         if (!next()){
             throwError("ожидалась закрыващая квадратная скобка");
@@ -1717,8 +1768,10 @@ bool MyTranslator::getPointOnFigure(t_Variable &result){
 
         t_Variable tmp;
         tmp.type = "float";
-
-        if (!rightPart(tmp)) return false;
+        if (!rightPart(tmp)) {
+            throwError("внутри квадратных скобок должен быть обьект типа 'float'");
+            return false;
+        }
 
         if (!next()){
             throwError("ожидалась закрыващая квадратная скобка");

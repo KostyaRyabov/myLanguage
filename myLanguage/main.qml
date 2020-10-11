@@ -53,7 +53,7 @@ Window {
                             }
                         }
 
-                        p--;
+                        pp--;
 
                         if (translator.getX(f,pp) === translator.getX(f,0) && translator.getY(f,pp) === translator.getY(f,0)){
                             ctx.fillStyle = "rgba(255, 136, 26, 0.4)";
@@ -121,7 +121,11 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: ""
+                text: "figure s1 = {(100,100),(110,20),(200,100),(150,170)};
+
+figure s2 = s1+[20,0];
+
+draw (s2-s2-s2);"
 
                 placeholderText: qsTr("Введите команду...")
 
@@ -321,7 +325,7 @@ Window {
         Text{
             id: errorOutput
 
-            width: 400
+            onWidthChanged: if (width > 400) errorOutput.width = 400;
 
             color: "black"
 

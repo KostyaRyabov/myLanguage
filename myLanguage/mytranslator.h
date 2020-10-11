@@ -106,7 +106,7 @@ private:
     int getIdxOfNearestEdge(QPointF &point, t_Figure &figure);
     QPointF normalizedVector(QPointF v);
     bool cross (QPointF &L11,QPointF &L12, QPointF &L21,QPointF &L22, QPointF *res = nullptr);
-    void simpify(t_Figure &figure);
+    bool simplify(t_Figure &figure);
 
     bool onSameLine(int i, QHash<int,int> &ranges);
     QPair<int,int> getRange(int i, QHash<int,int> &ranges);
