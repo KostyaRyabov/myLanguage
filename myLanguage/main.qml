@@ -26,15 +26,13 @@ Window {
 
         onPaint: {
             var ctx = getContext("2d");
-            var backCtx = backCanvas.getContext('2d');
 
             ctx.reset()
 
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "black"
-
-
             for (let f = 0; f < translator.amountOfFigures(); f++){
+                ctx.lineWidth = translator.getStrokeWidth(f);
+                ctx.strokeStyle = translator.getStrokeColor(f);
+
                 ctx.beginPath();
 
                 drawingCanvas.list = translator.getHidenEdges(f);
@@ -56,20 +54,22 @@ Window {
                         pp--;
 
                         if (translator.getX(f,pp) === translator.getX(f,0) && translator.getY(f,pp) === translator.getY(f,0)){
-                            ctx.fillStyle = "rgba(255, 136, 26, 0.4)";
+                            ctx.fillStyle = translator.getFillColor(f);
                             ctx.fill();
                         }
 
                         ctx.stroke();
                     }
 
-                    ctx.fillStyle = "rgba(255, 26, 26, 0.4)";
+                    ctx.fillStyle = translator.getDotColor(f);
 
-                    for (pp = 0; pp < translator.amountOfPointsOnFigure(f); pp++){
-                        ctx.beginPath();
-                        ctx.arc(translator.getX(f,pp), translator.getY(f,pp), 3, 360, 0, false);
-                        ctx.fill();
-                        ctx.stroke()
+                    if (translator.getDotRadius(f) > 0){
+                        for (pp = 0; pp < translator.amountOfPointsOnFigure(f); pp++){
+                            ctx.beginPath();
+                            ctx.arc(translator.getX(f,pp), translator.getY(f,pp), translator.getDotRadius(f), 360, 0, false);
+                            ctx.fill();
+                            ctx.stroke()
+                        }
                     }
                 }
             }
@@ -121,11 +121,7 @@ Window {
             TextArea.flickable: TextArea{
                 id: textInput
 
-                text: "figure s1 = {(100,100),(110,20),(200,100),(150,170)};
-
-figure s2 = s1+[20,0];
-
-draw (s2-s2-s2);"
+                text: "color c = [1,2,3,4];"
 
                 placeholderText: qsTr("Введите команду...")
 

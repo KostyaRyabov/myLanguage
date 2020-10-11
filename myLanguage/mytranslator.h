@@ -8,6 +8,7 @@
 #include <math.h>
 #include <limits>
 #include <QHash>
+#include <QColor>
 
 const double EPS = 0.1;
 
@@ -35,6 +36,14 @@ struct t_Figure{
     QList<QPointF> data;
     QMap<int,Jump> jumps;
     QHash<int,int> transition;
+
+    QColor FillColor = QColor(255, 145, 66, 150);
+
+    QColor StrokeColor = QColor(0,0,0,150);
+    int StrokeWidth = 2;
+
+    QColor DotColor = QColor(255,0,0,150);
+    int DotRadius = 3;
 };
 
 struct RowData{
@@ -64,6 +73,12 @@ public:
     Q_INVOKABLE int getX(int FigureID, int PointID) const;
     Q_INVOKABLE int getY(int FigureID, int PointID) const;
 
+    Q_INVOKABLE QColor getFillColor(int FigureID) const;
+    Q_INVOKABLE QColor getStrokeColor(int FigureID) const;
+    Q_INVOKABLE QColor getDotColor(int FigureID) const;
+    Q_INVOKABLE int getStrokeWidth(int FigureID) const;
+    Q_INVOKABLE int getDotRadius(int FigureID) const;
+
     Q_INVOKABLE QVariantList getHidenEdges(int FigureID) const;
 
     void throwError(QString text, int s_pos = -1);
@@ -81,7 +96,6 @@ private:
     bool getNum(t_Variable &result);
     bool getPoint(t_Variable &result);
     bool getFigure(t_Variable &result);
-    bool getVector(t_Variable &result);
 
     bool operation();
 
@@ -118,6 +132,7 @@ private:
 
     bool getPointOnFigure(t_Variable &result);
     bool getFloatOnPoint(t_Variable &result);
+    bool getFloatOnColor(t_Variable &result);
 signals:
     void getError(QString text, int pos);
     void DrawChanged();

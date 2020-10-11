@@ -28,6 +28,27 @@ void MyTranslator::read(QString text){
     emit DrawChanged();
 }
 
+QColor MyTranslator::getFillColor(int FigureID) const{
+    return Figures[FigureID].FillColor;
+}
+
+QColor MyTranslator::getStrokeColor(int FigureID) const{
+    return Figures[FigureID].StrokeColor;
+}
+
+QColor MyTranslator::getDotColor(int FigureID) const{
+    return Figures[FigureID].DotColor;
+}
+
+int MyTranslator::getStrokeWidth(int FigureID) const{
+    return Figures[FigureID].StrokeWidth;
+}
+
+int MyTranslator::getDotRadius(int FigureID) const{
+    return Figures[FigureID].DotRadius;
+}
+
+
 bool MyTranslator::getDraw() const{
     return draw;
 }
@@ -137,7 +158,7 @@ bool MyTranslator::varName(){
 }
 
 bool MyTranslator::operation(){
-    if (is("figure") || is("float") || is("vector") || is("point") || is("var")){
+    if (is("figure") || is("float") || is("vector") || is("point") || is("var") || is("color")){
         if (!next()){
             throwError("после '"+*word+"' должно было быть имя переменной");
             return false;
@@ -291,12 +312,97 @@ bool MyTranslator::operation(){
         word++;
         draw = true;
     }else if (getVariable()){
+        QString var = *(word);
+        QStringList property;
+        t_Variable result = ObjList[var];
+        t_Figure figure;
+
+        if (result.type == "figure"){
+            figure = result.value.value<t_Figure>();
+
+            if (!is("=",1)){
+                if (is("FillColor",1) || is("StrokeColor",1) || is("DotColor",1)){
+                    word++;
+                    property << *word;
+
+                    if (is("Red",1) || is("Green",1) || is("Blue",1) || is("Alpha",1)){
+                        word++;
+                        property << *word;
+                    }else if (!is("=",1) && !is(";",1)){
+                        word++;
+                        throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nRed, Green, Blue, Alpha");
+                        return false;
+                    }
+                }else if (is("StrokeWidth",1) || is("DotRadius")){
+                    word++;
+                    property << *word;
+                }else{
+                    word++;
+                    throwError("у фигур нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nFillColor, StrokeColor, DotColor, StrokeWidth, DotRadius");
+                    return false;
+                }
+            }
+        }
+
         if (is("=",1)){
-            QString var = *(word);
-            t_Variable result = ObjList[var];
             word++;
             if (next()){
-                if (!rightPart(result)) return false;
+                t_Variable tmp;
+
+                if (property.size() == 2){
+                    QColor *color;
+
+                    if (property.first() == "FillColor") color = &figure.FillColor;
+                    else if (property.first() == "StrokeColor") color = &figure.StrokeColor;
+                    else if (property.first() == "DotColor") color = &figure.DotColor;
+
+                    t_Variable tmp;
+                    tmp.type = "float";
+                    if (!rightPart(tmp)) return false;
+
+                    if (property.last()  == "Red") color->setRedF(tmp.value.toFloat());
+                    else if (property.last()  == "Green") color->setGreenF(tmp.value.toFloat());
+                    else if (property.last()  == "Blue") color->setBlueF(tmp.value.toFloat());
+                    else if (property.last()  == "Alpha") color->setAlphaF(tmp.value.toFloat());
+
+                    result.value.setValue(figure);
+                }else if (property.size() == 1){
+                    if (property.first() == "FillColor"){
+                        tmp.type = "color";
+                        tmp.value.setValue(figure.FillColor);
+                    }else if (property.first() == "StrokeColor"){
+                        tmp.type = "color";
+                        tmp.value.setValue(figure.StrokeColor);
+                    }else if (property.first() == "DotColor"){
+                        tmp.type = "color";
+                        tmp.value.setValue(figure.DotColor);
+                    }else if (property.first() == "DotRadius"){
+                        tmp.type = "float";
+                        tmp.value.setValue(figure.DotRadius);
+                    }else if (property.first() == "StrokeWidth"){
+                        tmp.type = "float";
+                        tmp.value.setValue(figure.StrokeWidth);
+                    }
+
+                    if (!rightPart(tmp)) return false;
+
+                    if (property.first() == "FillColor"){
+                        figure.FillColor = tmp.value.value<QColor>();
+                    }else if (property.first() == "StrokeColor"){
+                        figure.StrokeColor = tmp.value.value<QColor>();
+                    }else if (property.first() == "DotColor"){
+                        figure.DotColor = tmp.value.value<QColor>();
+                    }else if (property.first() == "DotRadius"){
+                        figure.DotRadius = tmp.value.toFloat();
+                    }else if (property.first() == "StrokeWidth"){
+                        figure.StrokeWidth = tmp.value.toFloat();
+                    }
+
+                    result.value.setValue(figure);
+                }else{
+                    if (!rightPart(result)) return false;
+                }
+
                 ObjList[var] = result;
             }else{
                 throwError("после знака '=' должно быть присваемое значение типа '"+result.type+"'");
@@ -1582,57 +1688,6 @@ QString MyTranslator::CutWord(QString &str){
     else return str;
 }
 
-bool MyTranslator::getVector(t_Variable &result){
-    if (!is("[")) {
-        throwError("вектор задается внутри квадратных скобок");
-        return false;
-    }
-
-    if (!next()){
-        throwError("после '"+*word+"' должно быть число");
-        return false;
-    }
-
-    t_Variable tmp;
-
-    tmp.type = "float";
-    if (!rightPart(tmp)) {
-        throwError("после открывающей квадратной скобки должен быть обьект типа 'float'");
-        return false;
-    }
-
-    if (!is(",",1)) {
-        throwError("после '"+*word+"' должна быть запятая");
-        return false;
-    }
-    word++;
-
-    if (!next()){
-        throwError("после '"+*word+"' должно быть число");
-        return false;
-    }
-
-     QPointF tmp_point;
-     tmp_point.setX(tmp.value.toFloat());
-
-     if (!rightPart(tmp)) {
-         throwError("после открывающей квадратной скобки должен быть обьект типа 'float'");
-         return false;
-     }
-
-     if (!is("]",1)){
-         throwError("после " + *word + "должна быть закрывающая квадратная скобка");
-         return false;
-     }
-     word++;
-
-     tmp_point.setY(tmp.value.toFloat());
-     result.value.setValue(tmp_point);
-     result.type = "vector";
-
-     return true;
-}
-
 bool MyTranslator::part(t_Variable &result){
     if (is("(")){
         int s_pos = word - inputData.begin();
@@ -1699,9 +1754,96 @@ bool MyTranslator::part(t_Variable &result){
 
         return getPointOnFigure(result);
     }else if (is("[")){
-        if (!getVector(result)) return false;
+        if (!next()){
+            throwError("после '"+*word+"' должно быть число");
+            return false;
+        }
 
-        return getFloatOnPoint(result);
+        t_Variable tmp;
+
+        tmp.type = "float";
+        if (!rightPart(tmp)) return false;
+
+        if (!is(",",1)) {
+            throwError("после '"+*word+"' должна быть запятая");
+            return false;
+        }
+        word++;
+
+        if (!next()){
+            throwError("после '"+*word+"' должно быть число");
+            return false;
+        }
+
+        QPointF tmp_point;
+        tmp_point.setX(tmp.value.toFloat());
+        if (!rightPart(tmp)) return false;
+        tmp_point.setY(tmp.value.toFloat());
+
+        QColor color;
+
+        if (result.type == "vector"){
+            if (!is("]",1)){
+                throwError("после '" + *word + "' должна быть закрывающая квадратная скобка");
+                return false;
+            }
+            word++;
+        }
+
+        if (is(",",1)) {
+            result.type = "color";
+            word++;
+
+            if (!next()){
+                throwError("после '"+*word+"' должно быть число");
+                return false;
+            }
+
+            if (!rightPart(tmp)) return false;
+
+            color.setRedF(tmp_point.x());
+            color.setGreenF(tmp_point.y());
+            color.setBlueF(tmp.value.toFloat());
+
+
+            if (is(",",1)) {
+                word++;
+
+                if (!next()){
+                    throwError("после '"+*word+"' должно быть число");
+                    return false;
+                }
+
+                if (!rightPart(tmp)) return false;
+
+                color.setAlphaF(tmp.value.toFloat());
+            }else if (is("]",1)){
+                color.setAlphaF(0.8);
+            }else{
+                throwError("после '"+*word+"' должна быть запятая или закрывающая квадратная скобка");
+                return false;
+            }
+        }else if (result.type == "color"){
+            throwError("после '"+*word+"' должна быть запятая");
+            return false;
+        }
+
+        if (!is("]",1)){
+            throwError("после '" + *word + "' должна быть закрывающая квадратная скобка");
+            return false;
+        }
+        word++;
+
+        if (result.type == "color"){
+            result.value.setValue(color);
+
+            return getFloatOnColor(result);
+        }else{
+            result.value.setValue(tmp_point);
+            result.type = "vector";
+
+            return getFloatOnPoint(result);
+        }
     }else if (getNum(result)){
         result.type = "float";
     }else if (getVariable()){
@@ -1713,6 +1855,28 @@ bool MyTranslator::part(t_Variable &result){
             return getFloatOnPoint(result);
         }
     }else return false;
+
+    return true;
+}
+
+bool MyTranslator::getFloatOnColor(t_Variable &result){
+    if (is("Red",1)){
+        word++;
+        result.type = "float";
+        result.value.setValue(result.value.value<QColor>().redF());
+    }else if (is("Green",1)){
+        word++;
+        result.type = "float";
+        result.value.setValue(result.value.value<QColor>().greenF());
+    }else if (is("Blue",1)){
+        word++;
+        result.type = "float";
+        result.value.setValue(result.value.value<QColor>().blueF());
+    }else if (is("Alpha",1)){
+        word++;
+        result.type = "float";
+        result.value.setValue(result.value.value<QColor>().alphaF());
+    }
 
     return true;
 }
