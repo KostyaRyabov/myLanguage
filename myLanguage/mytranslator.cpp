@@ -462,7 +462,7 @@ bool MyTranslator::simplify(t_Figure &figure){
                 continue;
             }
 
-            if (abs(it->x()-(it+1)->x()) <= EPS && abs(it->y()-(it+1)->y()) <= EPS){
+            if (abs(it->x()-(it+1)->x()) <= 1.1 && abs(it->y()-(it+1)->y()) <= 1.1){
                 it = figure.data.erase(it);
                 changed = true;
 
@@ -520,9 +520,9 @@ bool MyTranslator::isInside(QPointF point, t_Figure &figure, bool Ignore_borders
     QPointF vec = point+QPointF{2000,2000}, cp;
 
     for (int i = 0; i < size; i++){
-        if (figure.jumps.contains(i)) continue;
+        if (figure.jumps.contains(i) && figure.jumps.size()>1) continue;
 
-        if (fig[i] == point) return true;
+        if (fig[i] == point) return !Ignore_borders;
 
         ax1 = fig[i].x();
         ay1 = fig[i].y();
@@ -553,7 +553,7 @@ int MyTranslator::getIdxOfMinPerpendicular(QPointF &point, t_Figure &figure, flo
             y = point.y();
 
     for (int i = 0; i < size; i++){
-        if (figure.jumps.contains(i)) continue;
+        if (figure.jumps.contains(i) && figure.jumps.size() > 1) continue;
 
         x1 = fig[i].x();
         y1 = fig[i].y();
@@ -594,10 +594,10 @@ QList<QPointF> MyTranslator::IntersectionList(t_Figure &A, t_Figure &B){
     QPointF p,f;
 
     for (uint32_t i = 0; i < size_A; i++){
-        if (A.jumps.contains(i)) continue;
+        if (A.jumps.contains(i) && A.jumps.size() > 1) continue;
 
         for (uint32_t j = 0; j < size_B; j++){
-            if (B.jumps.contains(j)) continue;
+            if (B.jumps.contains(j) && B.jumps.size() > 1) continue;
 
             if (cross(Af[i],Af[i+1],Bf[j],Bf[j+1],&p)){
                 if (!list.contains(p)) list << p;
@@ -884,6 +884,12 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     uint32_t A_idx = 0, B_idx;
 
+                    getFigureInfo(A);
+                    getFigureInfo(B);
+
+                    if (simplify(A)) getFigureInfo(A);
+                    if (simplify(B)) getFigureInfo(B);
+
                     for (auto &p : list){
                         A_idx = getIdxOfMinPerpendicular(p, A);
                         if (Af[A_idx] != p) Af.insert(A_idx,p);
@@ -978,10 +984,10 @@ bool MyTranslator::rightPart(t_Variable &result){
                                     pv++;
 
                                     v = normalizedVector(Af[pv]-Af[i]);
-                                    stepA = isInside(Af[i]+v,B,true)?-1:1;
+                                    stepA = (isInside(Af[i]+v,B,true)?-1:1);
 
-                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     if (A.transition.contains(i)) {
+                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         if ((i - A.transition[i])*stepA > 0){
                                             i = A.transition[i];
                                             if (A.jumps.contains(i)) A.jumps[i].visited = true;
@@ -990,8 +996,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                     i+=stepA;
 
-                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     if (A.transition.contains(i)) {
+                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         i = A.transition[i];
                                         if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     }
@@ -1017,10 +1023,10 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                 pv++;
 
                                                 v = normalizedVector(Bf[pv]-Bf[j]);
-                                                stepB = isInside(Bf[j]+v,A,true)?-1:1;
+                                                stepB = (isInside(Bf[j]+v,A,true)?-1:1);
 
-                                                if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                 if (B.transition.contains(pc.B_idx)) {
+                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                     if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
                                                         j = B.transition[pc.B_idx];
                                                         if (B.jumps.contains(j)) B.jumps[j].visited = true;
@@ -1045,11 +1051,10 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                                     j+=stepB;
 
-                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
-
                                                     Rf << Bf[j];
 
                                                     if (B.transition.contains(j)){
+                                                        if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                         j = B.transition[j];
                                                         if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                     }
@@ -1058,11 +1063,11 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                             if (i == startPos) break;
 
-                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                             if (A.transition.contains(i)){
+                                                if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                                 i = A.transition[i];
                                                 if (A.jumps.contains(i)) A.jumps[i].visited = true;
-                                                if (i == startPos) break;
+                                                //if (i == startPos) break;
                                             }
                                         }
 
@@ -1072,8 +1077,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                         if (i == startPos) break;
 
-                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         if (A.transition.contains(i)){
+                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                             i = A.transition[i];
                                             if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                             if (i == startPos) break;
@@ -1280,8 +1285,8 @@ bool MyTranslator::rightPart(t_Variable &result){
                                     v = normalizedVector(Af[pv]-Af[i]);
                                     stepA = isInside(Af[i]+v,B,true)?-1:1;
 
-                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     if (A.transition.contains(i)) {
+                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         if ((i - A.transition[i])*stepA > 0){
                                             i = A.transition[i];
                                             if (A.jumps.contains(i)) A.jumps[i].visited = true;
@@ -1290,8 +1295,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                     i+=stepA;
 
-                                    if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     if (A.transition.contains(i)) {
+                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         i = A.transition[i];
                                         if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                     }
@@ -1319,8 +1324,8 @@ bool MyTranslator::rightPart(t_Variable &result){
                                                 v = normalizedVector(Bf[pv]-Bf[j]);
                                                 stepB = isInside(Bf[j]+v,A,true)?1:-1;
 
-                                                if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                 if (B.transition.contains(pc.B_idx)) {
+                                                    if (B.jumps.contains(j)) B.jumps[j].visited = true;
                                                     if ((pc.B_idx - B.transition[pc.B_idx])*stepB > 0){
                                                         j = B.transition[pc.B_idx];
                                                         if (B.jumps.contains(j)) B.jumps[j].visited = true;
@@ -1358,8 +1363,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                             if (i == startPos) break;
 
-                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                             if (A.transition.contains(i)){
+                                                if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                                 i = A.transition[i];
                                                 if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                                 if (i == startPos) break;
@@ -1372,8 +1377,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                                         Rf << Af[i];
 
-                                        if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                         if (A.transition.contains(i)){
+                                            if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                             i = A.transition[i];
                                             if (A.jumps.contains(i)) A.jumps[i].visited = true;
                                             if (i == startPos) break;
