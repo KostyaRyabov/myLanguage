@@ -56,21 +56,23 @@ bool MyTranslator::getDraw() const{
 void MyTranslator::throwError(QString text, int s_pos){
     QList<QString>::iterator iter = inputData.begin();
 
-    int    idx = 0, pos = 0,
+    int    idx = 0,
             n = ((s_pos!=-1)?s_pos:(word - iter));
 
     QList<QChar> dic{' ','\n','\t'};
 
     while (dic.contains(store[idx])) idx++;
+    if (idx == rx_comment.indexIn(store, idx, QRegExp::CaretMode::CaretAtOffset)) {
+        idx += rx_comment.matchedLength()+1;
+    }
 
     for (int i = 0; i < n; i++){
         idx += (*(iter + i)).length();
 
         while (dic.contains(store[idx])) idx++;
         if (idx == rx_comment.indexIn(store, idx, QRegExp::CaretMode::CaretAtOffset)) {
-            idx += rx_comment.matchedLength();
+            idx += rx_comment.matchedLength()+1;
         }
-        while (dic.contains(store[idx])) idx++;
     }
 
     emit getError(text, idx);

@@ -85,7 +85,7 @@ public:
 
     Q_INVOKABLE bool getDraw() const;
 private:
-    QRegExp rx_comment = QRegExp("\\\\[^\n]*");
+    QRegExp rx_comment = QRegExp("//[^\n]*");
 
     bool draw;
     QString store;
