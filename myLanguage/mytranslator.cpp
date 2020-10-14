@@ -8,7 +8,7 @@ MyTranslator::MyTranslator(QObject *parent)  :
 void MyTranslator::read(QString text){
     store = text;
 
-    inputData = text.
+    inputData = text.replace(rx_comment," ").
             replace(";"," ; ").replace("="," = ").replace("+"," + ").replace("-"," - ").
             replace("*"," * ").replace("/"," / ").replace("("," ( ").replace(")"," ) ").
             replace("["," [ ").replace("]"," ] ").replace("\t"," ").replace("\n"," ").
@@ -56,7 +56,7 @@ bool MyTranslator::getDraw() const{
 void MyTranslator::throwError(QString text, int s_pos){
     QList<QString>::iterator iter = inputData.begin();
 
-    int    idx = 0,
+    int    idx = 0, pos = 0,
             n = ((s_pos!=-1)?s_pos:(word - iter));
 
     QList<QChar> dic{' ','\n','\t'};
@@ -64,8 +64,13 @@ void MyTranslator::throwError(QString text, int s_pos){
     while (dic.contains(store[idx])) idx++;
 
     for (int i = 0; i < n; i++){
-         idx += (*(iter + i)).length();
-         while (dic.contains(store[idx])) idx++;
+        idx += (*(iter + i)).length();
+
+        while (dic.contains(store[idx])) idx++;
+        if (idx == rx_comment.indexIn(store, idx, QRegExp::CaretMode::CaretAtOffset)) {
+            idx += rx_comment.matchedLength();
+        }
+        while (dic.contains(store[idx])) idx++;
     }
 
     emit getError(text, idx);
@@ -137,7 +142,7 @@ bool MyTranslator::next(uint step){
 }
 
 bool MyTranslator::varName(){
-    if (is("figure") || is("float") || is("vector") || is("point") || is("draw") || is("rotate") || is("var")){
+    if (is("figure") || is("num") || is("vector") || is("point") || is("draw") || is("rotate") || is("var")){
         throwError("нельзя называть обьекты служебными именами");
         return false;
     }
@@ -158,7 +163,7 @@ bool MyTranslator::varName(){
 }
 
 bool MyTranslator::operation(){
-    if (is("figure") || is("float") || is("vector") || is("point") || is("var") || is("color")){
+    if (is("figure") || is("num") || is("vector") || is("point") || is("var") || is("color")){
         if (!next()){
             throwError("после '"+*word+"' должно было быть имя переменной");
             return false;
@@ -227,7 +232,7 @@ bool MyTranslator::operation(){
             return false;
         }
 
-        R.type = "float";
+        R.type = "num";
         if (!rightPart(R)) return false;
 
         auto fig = obj.value.value<t_Figure>();
@@ -263,6 +268,13 @@ bool MyTranslator::operation(){
             return false;
         }
 
+        if (is(")")){
+            throwError("функция 'draw' не может быть без аргументов. Введите в скобках список точек или фигур", word-inputData.begin()-1);
+            return false;
+        }
+
+        int s_pos = word - inputData.begin();
+
         t_Variable obj;
         if (!rightPart(obj)) return false;
 
@@ -274,7 +286,7 @@ bool MyTranslator::operation(){
         }else if (obj.type == "figure"){
             Figures << obj.value.value<t_Figure>();
         }else{
-            throwError("переменная '" + *word + "' не является фигурой или точкой");
+            throwError("нельзя преобразовать '" + obj.type + "' в 'figure'",s_pos);
             return false;
         }
 
@@ -336,35 +348,47 @@ bool MyTranslator::operation(){
                         word++;
                         property << *word;
 
-                        tmp.type = "float";
-                    }else if (!is("=",1) && !is(";",1)){
-                        word++;
-                        throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nRed, Green, Blue, Alpha");
+                        tmp.type = "num";
+
+                    }else if ((word+1) != inputData.end()){
+                        if (!is("=",1) && !is(";",1)){
+                            word++;
+                            throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nRed, Green, Blue, Alpha");
+                            return false;
+                        }
+                    }else{
+                        throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров цвета: Red, Green, Blue, Alpha");
                         return false;
                     }
                 }else if (is("StrokeWidth",1) || is("DotRadius",1)){
                     word++;
                     property << *word;
 
-                    tmp.type = "float";
-                }else if (is("Red",1) || is("Green",1) || is("Blue",1) || is("Alpha",1)){
-                    word++;
-                    property << *word;
-
-                    tmp.type = "float";
+                    tmp.type = "num";
+                }else if ((word+1) != inputData.end()){
+                    throwError("у фигур нет такого параметра '"+CutWord(*(word+1))+"'.\n\nВозможные варианты:\nFillColor, StrokeColor, DotColor, StrokeWidth, DotRadius");
+                    return false;
                 }else{
-                    word++;
-                    throwError("у фигур нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nFillColor, StrokeColor, DotColor, StrokeWidth, DotRadius");
+                    throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров фигуры:\nFillColor, StrokeColor, DotColor, StrokeWidth, DotRadius");
                     return false;
                 }
             }
-        }else if (is("Red",1) || is("Green",1) || is("Blue",1) || is("Alpha",1)){
-            word++;
-            property << *word;
-
-            tmp.type = "float";
         }
 
+        if (result.type == "color"){
+            if (is("Red",1) || is("Green",1) || is("Blue",1) || is("Alpha",1)){
+                word++;
+                property << *word;
+
+                tmp.type = "num";
+            }else if ((word+1) != inputData.end()){
+                if (!is("=",1) && !is(";",1)){
+                    word++;
+                    throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nRed, Green, Blue, Alpha");
+                    return false;
+                }
+            }
+        }
 
         if (is("=",1)){
             word++;
@@ -376,7 +400,7 @@ bool MyTranslator::operation(){
                     else if (property.first() == "StrokeColor") color = &figure.StrokeColor;
                     else if (property.first() == "DotColor") color = &figure.DotColor;
 
-                    tmp.type = "float";
+                    tmp.type = "num";
                     if (!rightPart(tmp)) return false;
 
                     if (property.last()  == "Red") color->setRedF(tmp.value.toFloat());
@@ -421,7 +445,6 @@ bool MyTranslator::operation(){
         }else{
             if (result.type == "color" && property.isEmpty()) throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров цвета: Red, Green, Blue, Alpha");
             else throwError("после слова '"+CutWord(*word)+"' должен быть знак '='");
-
 
             return false;
         }
@@ -778,7 +801,7 @@ bool MyTranslator::rightPart(t_Variable &result){
     if (!block(result)) return false;
 
     if (minus) {
-        if (result.type == "float"){
+        if (result.type == "num"){
             result.value.setValue(-result.value.toFloat());
         }else if (result.type == "point" || result.type == "vector"){
             QPointF tmp_point = result.value.toPointF();
@@ -801,8 +824,8 @@ bool MyTranslator::rightPart(t_Variable &result){
 
             if (!block(tmp)) return false;
 
-            if (result.type == "float"){
-                if (tmp.type == "float"){
+            if (result.type == "num"){
+                if (tmp.type == "num"){
                     result.value.setValue(result.value.toFloat()+tmp.value.toFloat());
                 }else{
                     throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
@@ -1112,8 +1135,8 @@ bool MyTranslator::rightPart(t_Variable &result){
             if (!next(2)) return false;
             if (!block(tmp)) return false;
 
-            if (result.type == "float"){
-                if (tmp.type == "float"){
+            if (result.type == "num"){
+                if (tmp.type == "num"){
                     result.value.setValue(result.value.toFloat()-tmp.value.toFloat());
                 }else{
                     throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
@@ -1425,8 +1448,8 @@ bool MyTranslator::block(t_Variable &result){
             if (!next(2)) return false;
             if (!part(tmp)) return false;
 
-            if (result.type == "float"){
-                if (tmp.type == "float"){
+            if (result.type == "num"){
+                if (tmp.type == "num"){
                     result.value.setValue(result.value.toFloat()*tmp.value.toFloat());
                 }else if (tmp.type == "vector"){
                     float num = result.value.toFloat();
@@ -1448,7 +1471,7 @@ bool MyTranslator::block(t_Variable &result){
                     result.type = "figure";
                 }
             }else if (result.type == "vector"){
-                if (tmp.type == "float"){
+                if (tmp.type == "num"){
                     float num = tmp.value.toFloat();
                     QPointF res_vec = result.value.toPointF();
                     result.value.setValue(res_vec*num);
@@ -1475,7 +1498,7 @@ bool MyTranslator::block(t_Variable &result){
                     result.type = "figure";
                 }
             }else if (result.type == "point"){
-                if (tmp.type == "float"){
+                if (tmp.type == "num"){
                     float num = tmp.value.toFloat();
                     QPointF res_point = result.value.value<QPointF>();
                     result.value.setValue(res_point*num);
@@ -1488,7 +1511,7 @@ bool MyTranslator::block(t_Variable &result){
                     return false;
                 }
             }else if (result.type == "figure"){
-                if (tmp.type == "float"){
+                if (tmp.type == "num"){
                     t_Figure res_fig = result.value.value<t_Figure>();
                     float num = tmp.value.toFloat();
                     auto o = getCenter(res_fig);
@@ -1517,8 +1540,8 @@ bool MyTranslator::block(t_Variable &result){
             if (!next(2)) return false;
             if (!part(tmp)) return false;
 
-            if (result.type == "float"){
-                if (tmp.type == "float"){
+            if (result.type == "num"){
+                if (tmp.type == "num"){
                     float num = tmp.value.toFloat();
                     if (num == 0){
                         throwError("нельзя делить на 0");
@@ -1552,7 +1575,7 @@ bool MyTranslator::block(t_Variable &result){
                     return false;
                 }
             }else if (result.type == "vector"){
-                if (tmp.type == "float"){
+                if (tmp.type == "num"){
                     float num = tmp.value.toFloat();
 
                     if (num == 0){
@@ -1577,7 +1600,7 @@ bool MyTranslator::block(t_Variable &result){
                     return false;
                 }
             }else if (result.type == "point"){
-                if (tmp.type == "float"){
+                if (tmp.type == "num"){
                     float num = tmp.value.toFloat();
 
                     if (num == 0){
@@ -1602,7 +1625,7 @@ bool MyTranslator::block(t_Variable &result){
                     return false;
                 }
             }else if (result.type == "figure"){
-                if (tmp.type == "float"){
+                if (tmp.type == "num"){
                     t_Figure res_fig = result.value.value<t_Figure>();
                     float num = tmp.value.toFloat();
 
@@ -1724,7 +1747,7 @@ bool MyTranslator::part(t_Variable &result){
 
         t_Variable tmp;
 
-        if (result.type == "point") tmp.type = "float";
+        if (result.type == "point") tmp.type = "num";
         if (!rightPart(tmp)) return false;
 
         if (!next()) {
@@ -1779,7 +1802,7 @@ bool MyTranslator::part(t_Variable &result){
 
         t_Variable tmp;
 
-        tmp.type = "float";
+        tmp.type = "num";
         if (!rightPart(tmp)) return false;
 
         if (!is(",",1)) {
@@ -1863,7 +1886,7 @@ bool MyTranslator::part(t_Variable &result){
             return getFloatOnPoint(result);
         }
     }else if (getNum(result)){
-        result.type = "float";
+        result.type = "num";
     }else if (getVariable()){
         result = ObjList[*word];
 
@@ -1880,19 +1903,19 @@ bool MyTranslator::part(t_Variable &result){
 bool MyTranslator::getFloatOnColor(t_Variable &result){
     if (is("Red",1)){
         word++;
-        result.type = "float";
+        result.type = "num";
         result.value.setValue(result.value.value<QColor>().redF());
     }else if (is("Green",1)){
         word++;
-        result.type = "float";
+        result.type = "num";
         result.value.setValue(result.value.value<QColor>().greenF());
     }else if (is("Blue",1)){
         word++;
-        result.type = "float";
+        result.type = "num";
         result.value.setValue(result.value.value<QColor>().blueF());
     }else if (is("Alpha",1)){
         word++;
-        result.type = "float";
+        result.type = "num";
         result.value.setValue(result.value.value<QColor>().alphaF());
     }
 
@@ -1909,9 +1932,9 @@ bool MyTranslator::getFloatOnPoint(t_Variable &result){
         }
 
         t_Variable tmp;
-        tmp.type = "float";
+        tmp.type = "num";
         if (!rightPart(tmp)) {
-            throwError("внутри квадратных скобок должен быть обьект типа 'float'");
+            throwError("внутри квадратных скобок должен быть обьект типа 'num'");
             return false;
         }
 
@@ -1933,7 +1956,7 @@ bool MyTranslator::getFloatOnPoint(t_Variable &result){
             result.value.setValue(result.value.toPointF().y());
         }
 
-        result.type = "float";
+        result.type = "num";
     }
 
     return true;
@@ -1949,9 +1972,9 @@ bool MyTranslator::getPointOnFigure(t_Variable &result){
         }
 
         t_Variable tmp;
-        tmp.type = "float";
+        tmp.type = "num";
         if (!rightPart(tmp)) {
-            throwError("внутри квадратных скобок должен быть обьект типа 'float'");
+            throwError("внутри квадратных скобок должен быть обьект типа 'num'");
             return false;
         }
 
