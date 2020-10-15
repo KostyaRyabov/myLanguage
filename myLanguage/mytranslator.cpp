@@ -64,6 +64,7 @@ void MyTranslator::throwError(QString text, int s_pos){
     while (dic.contains(store[idx])) idx++;
     if (idx == rx_comment.indexIn(store, idx, QRegExp::CaretMode::CaretAtOffset)) {
         idx += rx_comment.matchedLength()+1;
+        while (dic.contains(store[idx])) idx++;
     }
 
     for (int i = 0; i < n; i++){
@@ -71,7 +72,8 @@ void MyTranslator::throwError(QString text, int s_pos){
 
         while (dic.contains(store[idx])) idx++;
         if (idx == rx_comment.indexIn(store, idx, QRegExp::CaretMode::CaretAtOffset)) {
-            idx += rx_comment.matchedLength()+1;
+            idx += rx_comment.matchedLength();
+            while (dic.contains(store[idx])) idx++;
         }
     }
 
@@ -175,7 +177,7 @@ bool MyTranslator::operation(){
         QString initVar = *word;
 
         if (ObjList.contains(initVar)){
-            throwError("переменная " + CutWord(initVar) + " уже обьявлена");
+            throwError("переменная '" + CutWord(initVar) + "' уже обьявлена");
             return false;
         }
 
@@ -791,7 +793,7 @@ bool MyTranslator::rightPart(t_Variable &result){
     bool minus = false;
     QString outputType = result.type;
 
-    int s_pos = word-inputData.begin();
+    int s_pos = word-inputData.begin(), s_pos2;
 
     if (is("-")){
         minus = true;
@@ -821,6 +823,8 @@ bool MyTranslator::rightPart(t_Variable &result){
     t_Variable tmp;
 
     while(is("+",1) || is("-",1)){
+        s_pos2 = word-inputData.begin()+2;
+
         if (is("+",1)){
             if (!next(2)) return false;
 
@@ -830,7 +834,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                 if (tmp.type == "num"){
                     result.value.setValue(result.value.toFloat()+tmp.value.toFloat());
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
+                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\nnum",s_pos2);
                     return false;
                 }
             }else if (result.type == "point"){
@@ -855,7 +859,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(figure);
                     result.type = "figure";
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
+                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\npoint, vector, figure",s_pos2);
                     return false;
                 }
             }else if (result.type == "vector"){
@@ -876,7 +880,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
+                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\npoint, vector, figure",s_pos2);
                     return false;
                 }
             }else if (result.type == "figure"){
@@ -1129,7 +1133,7 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     result.value.setValue(res);
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'",s_pos);
+                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\npoint, vector, figure",s_pos2);
                     return false;
                 }
             }
@@ -1141,22 +1145,16 @@ bool MyTranslator::rightPart(t_Variable &result){
                 if (tmp.type == "num"){
                     result.value.setValue(result.value.toFloat()-tmp.value.toFloat());
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
+                    throwError("нельзя вычитать из '" + result.type + "' '"+ tmp.type +"'\nожидаемые типы объектов:\nnum",s_pos2);
                     return false;
                 }
             }else if (result.type == "point"){
-                if (tmp.type == "point"){
-                    throwError("точки нельзя вычитать");
-                    return false;
-                }else if (tmp.type == "vector"){
+                if (tmp.type == "vector"){
                     QPointF tmp_vec = tmp.value.toPointF();
                     QPointF res_point = result.value.toPointF();
                     result.value.setValue(res_point - tmp_vec);
-                }else if (tmp.type == "figure"){
-                    throwError("нельзя вычитать из точки фигуру");
-                    return false;
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
+                    throwError("нельзя вычитать из '" + result.type + "' '"+ tmp.type +"'\nожидаемые типы объектов:\nvector",s_pos2);
                     return false;
                 }
             }else if (result.type == "vector"){
@@ -1178,7 +1176,7 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
                 }else{
-                    throwError("нельзя преобразовать '" + tmp.type + "' в '"+ result.type +"'");
+                    throwError("нельзя вычитать из '" + result.type + "' '"+ tmp.type +"'\nожидаемые типы объектов:\nvector, point, figure",s_pos2);
                     return false;
                 }
             }else if (result.type == "figure"){
@@ -1423,7 +1421,7 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     result.value.setValue(res);
                 }else{
-                    throwError("нельзя вычитать '" + tmp.type + "' из '"+ result.type +"'");
+                    throwError("нельзя вычитать '" + tmp.type + "' из '"+ result.type +"'",s_pos2);
                     return false;
                 }
             }
@@ -1445,7 +1443,11 @@ bool MyTranslator::block(t_Variable &result){
 
     t_Variable tmp;
 
+    int s_pos;
+
     while(is("*",1) || is("/",1)){
+        s_pos = word-inputData.begin()+2;
+
         if (is("*",1)){
             if (!next(2)) return false;
             if (!part(tmp)) return false;
@@ -1509,7 +1511,7 @@ bool MyTranslator::block(t_Variable &result){
                     QPointF res_vec = result.value.toPointF();
                     result.value.setValue(QPointF(res_vec.x() * tmp_vec.x(), res_vec.y() * tmp_vec.y()));
                 }else{
-                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'");
+                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
                     return false;
                 }
             }else if (result.type == "figure"){
@@ -1534,7 +1536,7 @@ bool MyTranslator::block(t_Variable &result){
 
                     result.value.setValue(res_fig);
                 }else{
-                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'");
+                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
                     return false;
                 }
             }
@@ -1573,7 +1575,7 @@ bool MyTranslator::block(t_Variable &result){
                     result.value.setValue(QPointF(num / tmp_point.x(), num / tmp_point.y()));
                     result.type = "point";
                 }else{
-                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'");
+                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num, point",s_pos);
                     return false;
                 }
             }else if (result.type == "vector"){
@@ -1598,7 +1600,7 @@ bool MyTranslator::block(t_Variable &result){
                     QPointF res_vec = result.value.toPointF();
                     result.value.setValue(QPointF(res_vec.x() / tmp_vec.x(), res_vec.y() / tmp_vec.y()));
                 }else{
-                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'");
+                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
                     return false;
                 }
             }else if (result.type == "point"){
@@ -1623,7 +1625,7 @@ bool MyTranslator::block(t_Variable &result){
 
                     result.value.setValue(QPointF(res_vec.x() / tmp_vec.x(), res_vec.y() / tmp_vec.y()));
                 }else{
-                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'");
+                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
                     return false;
                 }
             }else if (result.type == "figure"){
@@ -1657,7 +1659,7 @@ bool MyTranslator::block(t_Variable &result){
                     }
                     result.value.setValue(res_fig);
                 }else{
-                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'");
+                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
                     return false;
                 }
             }
@@ -1788,10 +1790,6 @@ bool MyTranslator::part(t_Variable &result){
         }
 
         if (result.type == "point") return getFloatOnPoint(result);
-    }else if (is("}") || is(")") || is("]") || is(";")){
-        if (result.type == "var") throwError("после '" +*(word-1)+ "' ожидалось выражение");
-        else throwError("после '" +*(word-1)+ "' ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'");
-        return false;
     }else if (is("{")){
         if (!getFigure(result)) return false;
 
@@ -1830,7 +1828,6 @@ bool MyTranslator::part(t_Variable &result){
                 throwError("после '" + *word + "' должна быть закрывающая квадратная скобка");
                 return false;
             }
-            word++;
         }
 
         if (is(",",1)) {
