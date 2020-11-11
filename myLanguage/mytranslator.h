@@ -9,6 +9,7 @@
 #include <limits>
 #include <QHash>
 #include <QColor>
+#include <QStack>
 
 const double EPS = 0.1;
 
@@ -85,8 +86,14 @@ public:
 
     Q_INVOKABLE bool getDraw() const;
 private:
+    QMap<QString,QStringList> DT;
+    QStack<QString> op_stack;
+    QStack<QStringList> end_characters;
+
     QRegExp rx_comment = QRegExp("//[^\n]*");
 
+    bool requereAttr;
+    int amountOfParts;
     bool draw;
     QString store;
 
@@ -111,7 +118,7 @@ private:
     QList<t_Figure> Figures;
     QHash<QString, t_Variable> ObjList;
 
-    QString CutWord(QString &str);
+    QString CutWord(QString &str, bool isLeft = true);
 
     QPointF getCenter(t_Figure &figure);
     bool isFilledFigure(t_Figure &figure) const;
@@ -134,7 +141,6 @@ private:
 
     bool getPointOnFigure(t_Variable &result);
     bool getFloatOnPoint(t_Variable &result);
-    bool getFloatOnColor(t_Variable &result);
 signals:
     void getError(QString text, int pos);
     void DrawChanged();

@@ -3,6 +3,65 @@
 MyTranslator::MyTranslator(QObject *parent)  :
     QObject(parent)
 {
+    /*
+    DT["num"]["+"] = QStringList{"num"};
+    DT["num"]["-"] = QStringList{"num"};
+    DT["num"]["*"] = QStringList{"num"};
+    DT["num"]["/"] = QStringList{"num"};
+    DT["num"]["*"] = QStringList{"point"};
+    DT["num"]["*"] = QStringList{"vector"};
+    DT["num"]["*"] = QStringList{"figure"};
+    DT["num"]["+"] = QStringList{"num"};
+    DT["num"]["-"] = QStringList{"num"};
+    DT["num"]["*"] = QStringList{"num","point","vector","figure"};
+    DT["num"]["/"] = QStringList{"num"};
+
+    DT["point"]["+"] = QStringList{"vector"};
+    DT["point"]["-"] = QStringList{"vector"};
+    DT["point"]["*"] = QStringList{"num","vector"};
+    DT["point"]["/"] = QStringList{"num","vector"};
+    DT["point"]["+"] = QStringList{"point","figure"};
+    DT["point"]["+"] = QStringList{"point","vector","figure"};
+    DT["point"]["-"] = QStringList{"vector"};
+    DT["point"]["*"] = QStringList{"num","vector"};
+    DT["point"]["/"] = QStringList{"num","vector"};
+    DT["point"]["["] = QStringList{"num"};
+
+    DT["vector"]["+"] = QStringList{"point`"};
+    DT["vector"]["-"] = QStringList{"point"};
+    DT["vector"]["*"] = QStringList{"point"};
+    DT["vector"]["+"] = QStringList{"vector"};
+    DT["vector"]["-"] = QStringList{"vector"};
+    DT["vector"]["*"] = QStringList{"num", "vector"};
+    DT["vector"]["/"] = QStringList{"num","vector"};
+    DT["vector"]["+"] = QStringList{"figure"};
+    DT["vector"]["*"] = QStringList{"figure"};
+    DT["vector"]["+"] = QStringList{"point","vector","figure"};
+    DT["vector"]["-"] = QStringList{"point","vector"};
+    DT["vector"]["*"] = QStringList{"num","point","vector","figure"};
+    DT["vector"]["/"] = QStringList{"num","vector"};
+    DT["vector"]["["] = QStringList{"num"};
+
+    DT["figure"]["+"] = QStringList{"point","vector","figure"};
+    DT["figure"]["-"] = QStringList{"point","vector","figure"};
+    DT["figure"]["*"] = QStringList{"num","vector"};
+    DT["figure"]["/"] = QStringList{"num","vector"};
+    DT["figure"]["+"] = QStringList{"point","vector","figure"};
+    DT["figure"]["-"] = QStringList{"point","vector","figure"};
+    DT["figure"]["*"] = QStringList{"num","vector"};
+    DT["figure"]["/"] = QStringList{"num","vector"};
+    DT["figure"]["["] = QStringList{"num"};
+
+    DT["color"]["Red"];
+    DT["color"]["Green"];
+    DT["color"]["Blue"];
+    DT["color"]["Alpha"];
+    */
+
+    DT["num"] = QStringList{"+","-","*","/"};
+    DT["point"] = QStringList{"+","-","*","/","["};
+    DT["vector"] = QStringList{"+","-","*","/","["};
+    DT["figure"] = QStringList{"+","-","*","/","["};
 }
 
 void MyTranslator::read(QString text){
@@ -20,10 +79,16 @@ void MyTranslator::read(QString text){
     Figures.clear();
 
     draw = false;
+    end_characters.clear();
+    op_stack.clear();
+
+    end_characters.push({";"});
 
     while (word != inputData.end()){
         if (!operation()) return;
     }
+
+    end_characters.pop();
 
     emit DrawChanged();
 }
@@ -147,7 +212,10 @@ bool MyTranslator::next(uint step){
 
 bool MyTranslator::varName(){
     if (is("figure") || is("num") || is("vector") || is("point") || is("draw") || is("rotate") || is("var")){
-        throwError("нельзя называть обьекты служебными именами");
+        throwError("'"+CutWord(*word)+"' - нельзя называть обьекты служебными именами");
+        return false;
+    }else if (is(")") || is("]") || is("]") || is("-") || is("+") || is("*") || is("/") || is(";") || is("(") || is("[") || is("{")){
+        throwError("В имени объекта нельзя использовать служебные символы. Возможно только буквы и цифры с первой буквой.");
         return false;
     }
 
@@ -167,6 +235,9 @@ bool MyTranslator::varName(){
 }
 
 bool MyTranslator::operation(){
+    requereAttr = false;
+    amountOfParts = 0;
+
     if (is("figure") || is("num") || is("vector") || is("point") || is("var") || is("color")){
         if (!next()){
             throwError("после '"+*word+"' должно было быть имя переменной");
@@ -182,21 +253,23 @@ bool MyTranslator::operation(){
         }
 
         t_Variable obj;
-        obj.type = *(word-1);
+
+        if (*(word-1) == "var") obj.type = "";
+        else obj.type = *(word-1);
 
         if (is("=",1)){
             word++;
             if (next()){
                 if (!rightPart(obj)) return false;
             }else{
-                if (obj.type == "var") throwError("после знака '=' должно быть объявлено новое значение");
+                if (obj.type == "") throwError("после знака '=' должно быть объявлено новое значение");
                 else throwError("после знака '=' должно быть объявлено новое значение с типом '"+obj.type+"'");
                 return false;
             }
         }else if (!is(";",1)){
             throwError("после '"+CutWord(*word)+"' должно быть ';' или '='");
             return false;
-        }else if (obj.type == "var"){
+        }else if (obj.type == ""){
             throwError("динамическая переменная '"+CutWord(initVar)+"' не может быть неинициализированной");
             return false;
         }
@@ -229,15 +302,13 @@ bool MyTranslator::operation(){
             throwError("после '"+*word+"' должна быть запятая");
             return false;
         }
-        word++;
-
-        if(!next()) {
-            throwError("после запятой должно быть число\n(угол поворота фигуры по часовой стрелке)");
-            return false;
-        }
+        word+=2;
 
         R.type = "num";
+
+        end_characters.push({")"});
         if (!rightPart(R)) return false;
+        end_characters.pop();
 
         auto fig = obj.value.value<t_Figure>();
 
@@ -267,19 +338,16 @@ bool MyTranslator::operation(){
         }
         word++;
 
-        if (!next()) {
-            throwError("аргументы функции 'draw' должны быть фигурой или точкой");
-            return false;
-        }
-
-        if (is(")")){
+        if (is(")",1)){
             throwError("функция 'draw' не может быть без аргументов. Введите в скобках список точек или фигур", word-inputData.begin()-1);
             return false;
         }
+        word++;
 
         int s_pos = word - inputData.begin();
 
         t_Variable obj;
+        end_characters.push({",",")"});
         if (!rightPart(obj)) return false;
 
         if (obj.type == "point"){
@@ -300,12 +368,7 @@ bool MyTranslator::operation(){
         }
 
         while (is(",",1)){
-            word++;
-
-            if (!next()) {
-                throwError("введите фигуру или точку");
-                return false;
-            }
+            word+=2;
 
             obj.type.clear();
             if (!rightPart(obj)) return false;
@@ -328,6 +391,8 @@ bool MyTranslator::operation(){
             }
         }
 
+        end_characters.pop();
+
         word++;
         draw = true;
     }else if (getVariable()){
@@ -342,6 +407,8 @@ bool MyTranslator::operation(){
             figure = result.value.value<t_Figure>();
 
             if (!is("=",1)){
+                requereAttr = true;
+
                 if (is("FillColor",1) || is("StrokeColor",1) || is("DotColor",1)){
                     word++;
                     property << *word;
@@ -357,11 +424,11 @@ bool MyTranslator::operation(){
                     }else if ((word+1) != inputData.end()){
                         if (!is("=",1) && !is(";",1)){
                             word++;
-                            throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nRed, Green, Blue, Alpha");
+                            throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\n- 'Red'\n- 'Green'\n- 'Blue'\n- 'Alpha'");
                             return false;
                         }
                     }else{
-                        throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров цвета: Red, Green, Blue, Alpha");
+                        throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров цвета:\n- 'Red'\n- 'Green'\n- 'Blue'\n- 'Alpha'");
                         return false;
                     }
                 }else if (is("StrokeWidth",1) || is("DotRadius",1)){
@@ -370,10 +437,10 @@ bool MyTranslator::operation(){
 
                     tmp.type = "num";
                 }else if ((word+1) != inputData.end()){
-                    throwError("у фигур нет такого параметра '"+CutWord(*(word+1))+"'.\n\nВозможные варианты:\nFillColor, StrokeColor, DotColor, StrokeWidth, DotRadius");
+                    throwError("у фигур нет такого параметра '"+CutWord(*(word+1))+"'.\n\nВозможные варианты:\n- 'FillColor'\n- 'StrokeColor'\n- 'DotColor'\n- 'StrokeWidth'\n- 'DotRadius'");
                     return false;
                 }else{
-                    throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров фигуры:\nFillColor, StrokeColor, DotColor, StrokeWidth, DotRadius");
+                    throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров фигуры:\n- 'FillColor'\n- 'StrokeColor'\n- 'DotColor'\n- 'StrokeWidth'\n- 'DotRadius'");
                     return false;
                 }
             }
@@ -388,7 +455,7 @@ bool MyTranslator::operation(){
             }else if ((word+1) != inputData.end()){
                 if (!is("=",1) && !is(";",1)){
                     word++;
-                    throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\nRed, Green, Blue, Alpha");
+                    throwError("у обьекта 'color' нет такого параметра '"+CutWord(*word)+"'.\n\nВозможные варианты:\n- 'Red'\n- 'Green'\n- 'Blue'\n- 'Alpha'");
                     return false;
                 }
             }
@@ -447,7 +514,7 @@ bool MyTranslator::operation(){
                 return false;
             }
         }else{
-            if (result.type == "color" && property.isEmpty()) throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров цвета: Red, Green, Blue, Alpha");
+            if (result.type == "color" && property.isEmpty()) throwError("после слова '"+CutWord(*word)+"' ожидался знак '=' или один из параметров цвета:\n- 'Red'\n- 'Green'\n- 'Blue'\n- 'Alpha");
             else throwError("после слова '"+CutWord(*word)+"' должен быть знак '='");
 
             return false;
@@ -455,7 +522,7 @@ bool MyTranslator::operation(){
     }else return false;
 
     if (!is(";",1)){
-        throwError("после "+CutWord(*word)+" ожидалось ';'");
+        throwError("после '"+CutWord(*word)+"' ожидалось ';'");
         return false;
     }
 
@@ -797,7 +864,7 @@ bool MyTranslator::rightPart(t_Variable &result){
 
     if (is("-")){
         minus = true;
-        if (!next()) return false;
+        word++;
     }else if (is("+")){
         word++;
     }
@@ -820,22 +887,48 @@ bool MyTranslator::rightPart(t_Variable &result){
 
     }
 
+    if (requereAttr && amountOfParts == 1 && (result.type == "color" || result.type == "figure")) return true;
+
     t_Variable tmp;
 
     while(is("+",1) || is("-",1)){
-        s_pos2 = word-inputData.begin()+2;
+        word+=2;
+        s_pos2 = word-inputData.begin();
 
-        if (is("+",1)){
-            if (!next(2)) return false;
+        op_stack.push(*(word-1));
 
+        if (is("+",-1)){
             if (!block(tmp)) return false;
+
+            auto pre_str = "нельзя складывать '" + result.type + "' с '"+ tmp.type +"'.";
 
             if (result.type == "num"){
                 if (tmp.type == "num"){
                     result.value.setValue(result.value.toFloat()+tmp.value.toFloat());
                 }else{
-                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\nnum",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемый тип объекта - 'num'.";
+
+                    if (tmp.type == "vector"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"'");
+                        return false;
+                    }else if (tmp.type == "point"){
+                        if (is(")")){
+                            throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]'  после '"+ CutWord(*word) +"', или стоит убрать запятую внутри скобок, или другой знак операции, такой как знак '*' или '/' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'");
+                        }else{
+                            throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]'  после '"+ CutWord(*word) +"', или другой знак операции, такой как знак '*' или '/' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'");
+                        }
+
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]'  после '"+ CutWord(*word) +"' или другой знак операции, такой как знак '*' или '/' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'");
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "point"){
                 if (tmp.type == "point"){
@@ -859,8 +952,29 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(figure);
                     result.type = "figure";
                 }else{
-                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\npoint, vector, figure",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'point'\n- 'vector'\n- 'figure'.";
+
+                    if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'point', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"'");
+                        return false;
+                    }else if (tmp.type == "num"){
+                        if (word-inputData.begin()-s_pos2 == 0){
+                            if (is(")")){
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                            }else{
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                            }
+                        }else{
+                            throwError(str+"\n\nВозможные знаки операций после '"+ CutWord(*word) +"' или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                        }
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "vector"){
                 if (tmp.type == "point"){
@@ -880,8 +994,26 @@ bool MyTranslator::rightPart(t_Variable &result){
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
                 }else{
-                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\npoint, vector, figure",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'point'\n -'vector'\n -'figure'.";
+
+                    if (tmp.type == "num"){
+                        if (word-inputData.begin()-s_pos2 == 0){
+                            if (is(")")){
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                            }else{
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                            }
+                        }else{
+                            throwError(str+"\n\nВозможные знаки операций после '"+ CutWord(*word) +"' или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                        }
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "figure"){
                 if (tmp.type == "vector"){
@@ -1133,20 +1265,60 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     result.value.setValue(res);
                 }else{
-                    throwError("нельзя складывать '" + result.type + "' с '"+ tmp.type +"'\nожидаемые типы объектов:\npoint, vector, figure",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'point'\n- 'vector'\n- 'figure'.";
+
+                    if (tmp.type == "num"){
+                        if (word-inputData.begin()-s_pos2 == 0){
+                            if (is(")")){
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                            }else{
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                            }
+                        }else{
+                            throwError(str+"\n\nВозможные знаки операций после '"+ CutWord(*word) +"' или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                        }
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }
-        }else if (is("-",1)){
-            if (!next(2)) return false;
+        }else if (is("-",-1)){
             if (!block(tmp)) return false;
+
+            auto pre_str = "нельзя вычитать из '" + result.type + "' '"+ tmp.type +"'.";
 
             if (result.type == "num"){
                 if (tmp.type == "num"){
                     result.value.setValue(result.value.toFloat()-tmp.value.toFloat());
                 }else{
-                    throwError("нельзя вычитать из '" + result.type + "' '"+ tmp.type +"'\nожидаемые типы объектов:\nnum",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемый тип объекта - 'num'.";
+
+                    if (tmp.type == "vector"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"'");
+                        return false;
+                    }else if (tmp.type == "point"){
+                        if (is(")")){
+                            throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]'  после '"+ CutWord(*word) +"' или стоит убрать запятую внутри скобок");
+                        }else{
+                            throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]'  после '"+ CutWord(*word) +"'");
+                        }
+
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]'  после '"+ CutWord(*word) +"'");
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "point"){
                 if (tmp.type == "vector"){
@@ -1154,8 +1326,35 @@ bool MyTranslator::rightPart(t_Variable &result){
                     QPointF res_point = result.value.toPointF();
                     result.value.setValue(res_point - tmp_vec);
                 }else{
-                    throwError("нельзя вычитать из '" + result.type + "' '"+ tmp.type +"'\nожидаемые типы объектов:\nvector",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемый тип объекта - 'vector'.";
+
+                    if (tmp.type == "vector"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"'");
+                        return false;
+                    }else if (tmp.type == "num"){
+                        if (word-inputData.begin()-s_pos2 == 0){
+                            if (is(")")){
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                            }else{
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                            }
+                        }else{
+                            throwError(str+"\n\nВозможные знаки операций после '"+ CutWord(*word) +"' или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                        }
+                        return false;
+                    }else if (tmp.type == "point"){
+                        throwError(str+"\n\nТочку можно вычитать из фигуры, содержащей больше одной точки.\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]'  после '"+ CutWord(*word) +"' или вместо вычитания должно быть сложение");
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nФигуру можно вычитать из другой фигуры, содержащей больше одной точки.\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]'  после '"+ CutWord(*word) +"'");
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "vector"){
                 if (tmp.type == "point"){
@@ -1167,17 +1366,30 @@ bool MyTranslator::rightPart(t_Variable &result){
                     QPointF res_vec = result.value.toPointF();
                     QPointF tmp_vec = tmp.value.toPointF();
                     result.value.setValue(res_vec - tmp_vec);
-                }else if (tmp.type == "figure"){
-                    t_Figure tmp_fig = tmp.value.value<t_Figure>();
-                    QPointF res_vec = result.value.toPointF();
-                    for (auto &p : tmp_fig.data){
-                        p = res_vec - p;
-                    }
-                    result.value.setValue(tmp_fig);
-                    result.type = "figure";
                 }else{
-                    throwError("нельзя вычитать из '" + result.type + "' '"+ tmp.type +"'\nожидаемые типы объектов:\nvector, point, figure",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'vector'\n -'point'.";
+
+                    if (tmp.type == "num"){
+                        if (word-inputData.begin()-s_pos2 == 0){
+                            if (is(")")){
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                            }else{
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                            }
+                        }else{
+                            throwError(str+"\n\nВозможные знаки операций после '"+ CutWord(*word) +"' или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                        }
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]'  после '"+ CutWord(*word) +"'");
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "figure"){
                 if (tmp.type == "vector"){
@@ -1421,17 +1633,104 @@ bool MyTranslator::rightPart(t_Variable &result){
 
                     result.value.setValue(res);
                 }else{
-                    throwError("нельзя вычитать '" + tmp.type + "' из '"+ result.type +"'",s_pos2);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'point'\n- 'vector'\n- 'figure'.";
+
+                    if (tmp.type == "num"){
+                        if (word-inputData.begin()-s_pos2 == 0){
+                            if (is(")")){
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                            }else{
+                                throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                            }
+                        }else{
+                            throwError(str+"\n\nВозможные знаки операций после '"+ CutWord(*word) +"' или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                        }
+                        return false;
+                    }else if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos2);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }
         }
+
+        op_stack.pop();
     }
 
     if (!outputType.isEmpty()){
-        if (result.type != outputType && outputType != "var"){
-            throwError("нельзя преобразовать '" + result.type + "' в '"+ outputType +"'",s_pos);
-            return false;
+        if (result.type != outputType && outputType != "" && !(outputType == "figure" && result.type == "point")){
+
+            auto str = "нельзя преобразовать '" + result.type + "' в '"+ outputType +"'";
+
+            if (outputType == "num"){
+                if (result.type == "vector" || result.type == "point"){
+                    throwError(str + ".\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]'  после '"+ CutWord(*word) +"'",s_pos);
+                    return false;
+                }else if (result.type == "figure"){
+                    throwError(str + ".\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]'  после '"+ CutWord(*word) +"'.",s_pos);
+                    return false;
+                }else if (result.type == "color"){
+                    throwError(str + ".\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты).", s_pos);
+                    return false;
+                }
+            }else if (outputType == "point"){
+                if (result.type == "vector"){
+                    throwError(str + ".\nПосле '"+ CutWord(*word) +"' возможно ожидалось сложение/вычитание точки",s_pos);
+                    return false;
+                }else if (result.type == "figure"){
+                    throwError(str + ".\nВозможно ожидался индексируемый элемент объекта типа 'point', который вызывается добавлением конструкции '[ num ]'  после '"+ CutWord(*word) +"'.",s_pos);
+                    return false;
+                }else if (result.type == "color"){
+                    throwError(str + ".\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты).", s_pos);
+                    return false;
+                }else if (result.type == "num"){
+                    if (is(")")){
+                        throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                    }else{
+                        throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                    }
+                    return false;
+                }
+            }else if (outputType == "vector"){
+                if (result.type == "point"){
+                    throwError(str + ".\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"'",s_pos);
+                    return false;
+                }else if (result.type == "figure"){
+                    throwError(str + ".\nВозможно ожидался индексируемый элемент объекта типа 'point', который вызывается добавлением конструкции '[ num ][ num ]' после '"+ CutWord(*word) +"'.",s_pos);
+                    return false;
+                }else if (result.type == "color"){
+                    throwError(str + ".\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты).", s_pos);
+                    return false;
+                }else if (result.type == "num"){
+                    if (is(")")){
+                        throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                    }else{
+                        throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                    }
+                    return false;
+                }
+            }else if (outputType == "figure"){
+                if (result.type == "color"){
+                    throwError(str + ".\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты).", s_pos);
+                    return false;
+                }else if (result.type == "num"){
+                    if (is(")")){
+                        throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/' или возможно была пропущена запятая внутри скобок");
+                    }else{
+                        throwError(str+"\n\nВозможные знаки операций после или перед '" + CutWord(*(word - (word-inputData.begin()-s_pos2))) + "'':\n- '*'\n- '/'");
+                    }
+                    return false;
+                }else if (result.type == "vector"){
+                    throwError(str + ".\nВозможные знаки операций после '"+ CutWord(*word) +"':\n- '+'\n- '-'\n- '*'\n- '/'",s_pos);
+                    return false;
+                }
+            }else if (outputType == "color"){
+                throwError(str + ".\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.", s_pos);
+                return false;
+            }
         }
     }
 
@@ -1442,15 +1741,18 @@ bool MyTranslator::block(t_Variable &result){
     if (!part(result)) return false;
 
     t_Variable tmp;
-
     int s_pos;
 
     while(is("*",1) || is("/",1)){
-        s_pos = word-inputData.begin()+2;
+        word+=2;
+        s_pos = word-inputData.begin();
 
-        if (is("*",1)){
-            if (!next(2)) return false;
+        op_stack.push(*(word-1));
+
+        if (is("*",-1)){
             if (!part(tmp)) return false;
+
+            auto pre_str = "Нельзя перемножать '" + result.type + "' с '"+ tmp.type +"'.";
 
             if (result.type == "num"){
                 if (tmp.type == "num"){
@@ -1473,6 +1775,16 @@ bool MyTranslator::block(t_Variable &result){
                     }
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
+                }else{
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'num'\n- 'point'\n- 'vector'\n- 'figure'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "vector"){
                 if (tmp.type == "num"){
@@ -1500,6 +1812,16 @@ bool MyTranslator::block(t_Variable &result){
 
                     result.value.setValue(tmp_fig);
                     result.type = "figure";
+                }else{
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'num'\n- 'point'\n- 'vector'\n- 'figure'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "point"){
                 if (tmp.type == "num"){
@@ -1511,8 +1833,21 @@ bool MyTranslator::block(t_Variable &result){
                     QPointF res_vec = result.value.toPointF();
                     result.value.setValue(QPointF(res_vec.x() * tmp_vec.x(), res_vec.y() * tmp_vec.y()));
                 }else{
-                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'vector'\n- 'num'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]' после '"+ CutWord(*word)  +"' или другой знак операции, такой как '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else if (tmp.type == "point"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word)  +"' или другой знак операции, такой как '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "figure"){
                 if (tmp.type == "num"){
@@ -1536,13 +1871,27 @@ bool MyTranslator::block(t_Variable &result){
 
                     result.value.setValue(res_fig);
                 }else{
-                    throwError("нельзя перемножать '"+ result.type +"' с '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'vector'\n- 'num'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else if (tmp.type == "point"){
+                        throwError(str+"\n\nВозможно ожидался  индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }
-        }else if (is("/",1)){
-            if (!next(2)) return false;
+        }else if (is("/",-1)){
             if (!part(tmp)) return false;
+
+            auto pre_str = "Нельзя делить '" + result.type + "' на '"+ tmp.type +"'.";
 
             if (result.type == "num"){
                 if (tmp.type == "num"){
@@ -1575,8 +1924,18 @@ bool MyTranslator::block(t_Variable &result){
                     result.value.setValue(QPointF(num / tmp_point.x(), num / tmp_point.y()));
                     result.type = "point";
                 }else{
-                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num, point",s_pos);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'vector'\n- 'num'\n- 'point'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]' или индексируемый элемент объекта типа 'point', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +  +"' или другой знак операции, такой как '+' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "vector"){
                 if (tmp.type == "num"){
@@ -1600,8 +1959,21 @@ bool MyTranslator::block(t_Variable &result){
                     QPointF res_vec = result.value.toPointF();
                     result.value.setValue(QPointF(res_vec.x() / tmp_vec.x(), res_vec.y() / tmp_vec.y()));
                 }else{
-                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'vector'\n- 'num'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как знак '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else if (tmp.type == "point"){
+                        throwError(str+"\n\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как знак '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "point"){
                 if (tmp.type == "num"){
@@ -1625,8 +1997,21 @@ bool MyTranslator::block(t_Variable &result){
 
                     result.value.setValue(QPointF(res_vec.x() / tmp_vec.x(), res_vec.y() / tmp_vec.y()));
                 }else{
-                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'vector'\n- 'num'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как знак '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else if (tmp.type == "point"){
+                        throwError(str+"\n\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как знак '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }else if (result.type == "figure"){
                 if (tmp.type == "num"){
@@ -1659,11 +2044,26 @@ bool MyTranslator::block(t_Variable &result){
                     }
                     result.value.setValue(res_fig);
                 }else{
-                    throwError("нельзя делить '"+ result.type +"' на '" + tmp.type + "'\nожидаемые типы объектов:\nvector, num",s_pos);
-                    return false;
+                    auto str = pre_str+".\nОжидаемые типы объектов:\n- 'vector'\n- 'num'.";
+
+                    if (tmp.type == "color"){
+                        throwError(str+"\n\nНад типом 'color' нельзя проводить вычисления, его можно только объявить.\nВозможно ожидался тип 'vector' (прописаны лишние атрибуты или стоят лишние запятые).",s_pos);
+                        return false;
+                    }else if (tmp.type == "figure"){
+                        throwError(str+"\n\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ][ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else if (tmp.type == "point"){
+                        throwError(str+"\n\nВозможно ожидался индексируемый элемент объекта типа 'num', который вызывается добавлением конструкции '[ num ]' после '"+ CutWord(*word) +"' или другой знак операции, такой как '+' или '-' перед '" + CutWord(*(word - (word-inputData.begin()-s_pos))) + "'",s_pos);
+                        return false;
+                    }else{
+                        throwError(str, s_pos);
+                        return false;
+                    }
                 }
             }
         }
+
+        op_stack.pop();
     }
 
     return true;
@@ -1698,6 +2098,8 @@ bool MyTranslator::getFigure(t_Variable &result){
     tmp.type = "point";
     if (!rightPart(tmp)) return false;
 
+    end_characters.push({",","}"});
+
     t_Figure tmp_fig;
     tmp_fig.data << tmp.value.toPointF();
 
@@ -1714,10 +2116,8 @@ bool MyTranslator::getFigure(t_Variable &result){
         tmp_fig.data << tmp.value.toPointF();
     }
 
-    if (!is("}",1)){
-        throwError("продолжите список точек или завершите фигурной скобкой");
-        return false;
-    }
+    end_characters.pop();
+
     word++;
 
     if (!isFilledFigure(tmp_fig) && tmp_fig.data.size() > 1) tmp_fig.data << tmp_fig.data.first();
@@ -1728,31 +2128,54 @@ bool MyTranslator::getFigure(t_Variable &result){
     return true;
 }
 
-QString MyTranslator::CutWord(QString &str){
-    if (str.size() > 10) return (str.left(10) + "...");
-    else return str;
+QString MyTranslator::CutWord(QString &str, bool isLeft){
+    if (isLeft){
+        if (str.size() > 10) return (str.left(10) + "...");
+        else return str;
+    }else{
+        if (str.size() > 10) return ("..." + str.right(10));
+        else return str;
+    }
 }
 
 bool MyTranslator::part(t_Variable &result){
+    auto requeredType = result.type;
+
+    if (word == inputData.end()){
+        throwError("после '"+ CutWord(*(word-1),true) +"' ожидалось:\n- 'num'\n- 'point'\n- 'vector'\n- 'figure'");
+        return false;
+    }
+
     if (is("(")){
         int s_pos = word - inputData.begin();
 
         if (!next()){
-            if (result.type == "var") throwError("после открывающейся круглой скобоки ожидалось выражение",s_pos);
+            if (result.type == "") throwError("после открывающейся круглой скобоки ожидалось выражение",s_pos);
             else throwError("после открывающейся круглой скобоки ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'",s_pos);
             return false;
         }
 
+        if (is(",")) {
+            if (result.type == "") throwError("перед запятой ожидалась переменная или выражение",s_pos);
+            else throwError("перед запятой ожидалась переменная или выражение, результат которого должен соответствовать типу '"+result.type+"'",s_pos);
+            return false;
+        }
+
         if (is(")")){
-            if (result.type == "var") throwError("внутри круглых скобок ожидалось выражение",s_pos);
+            if (result.type == "") throwError("внутри круглых скобок ожидалось выражение",s_pos);
             else throwError("внутри круглых скобок ожидалось выражение, результат которого должен соответствовать типу '"+result.type+"'",s_pos);
             return false;
         }
 
         t_Variable tmp;
-
         if (result.type == "point") tmp.type = "num";
+
+        if (result.type == "point") end_characters.push({","});
+        else end_characters.push({",",")"});
+
         if (!rightPart(tmp)) return false;
+
+        end_characters.pop();
 
         if (!next()) {
             if (result.type == "point") throwError("после '"+CutWord(*word)+"' должна быть запятая");
@@ -1762,14 +2185,16 @@ bool MyTranslator::part(t_Variable &result){
 
         if (is(",")) {
             if (!next()){
-                throwError("после запятой должно быть число");
+                throwError("после запятой должен быть объект типа 'num'");
                 return false;
             }
 
              QPointF tmp_point;
              tmp_point.setX(tmp.value.toFloat());
 
+             end_characters.push({")"});
              if (!rightPart(tmp)) return false;
+             end_characters.pop();
 
              tmp_point.setY(tmp.value.toFloat());
              result.value.setValue(tmp_point);
@@ -1789,11 +2214,11 @@ bool MyTranslator::part(t_Variable &result){
             return false;
         }
 
-        if (result.type == "point") return getFloatOnPoint(result);
+        if (result.type == "point") if (!getFloatOnPoint(result)) return false;
     }else if (is("{")){
         if (!getFigure(result)) return false;
 
-        return getPointOnFigure(result);
+        if (!getPointOnFigure(result)) return false;
     }else if (is("[")){
         if (!next()){
             throwError("после '"+*word+"' должно быть число");
@@ -1801,14 +2226,12 @@ bool MyTranslator::part(t_Variable &result){
         }
 
         t_Variable tmp;
-
         tmp.type = "num";
-        if (!rightPart(tmp)) return false;
 
-        if (!is(",",1)) {
-            throwError("после '"+*word+"' должна быть запятая");
-            return false;
-        }
+        end_characters.push({","});
+        if (!rightPart(tmp)) return false;
+        end_characters.pop();
+
         word++;
 
         if (!next()){
@@ -1818,17 +2241,18 @@ bool MyTranslator::part(t_Variable &result){
 
         QPointF tmp_point;
         tmp_point.setX(tmp.value.toFloat());
+
+        if (result.type == "vector") end_characters.push({"]"});
+        else if (result.type == "color") end_characters.push({","});
+        else end_characters.push({",","]"});
+
         if (!rightPart(tmp)) return false;
+
+        end_characters.pop();
+
         tmp_point.setY(tmp.value.toFloat());
 
         QColor color;
-
-        if (result.type == "vector"){
-            if (!is("]",1)){
-                throwError("после '" + *word + "' должна быть закрывающая квадратная скобка");
-                return false;
-            }
-        }
 
         if (is(",",1)) {
             result.type = "color";
@@ -1839,7 +2263,9 @@ bool MyTranslator::part(t_Variable &result){
                 return false;
             }
 
+            end_characters.push({",","]"});
             if (!rightPart(tmp)) return false;
+            end_characters.pop();
 
             color.setRedF(tmp_point.x());
             color.setGreenF(tmp_point.y());
@@ -1854,68 +2280,127 @@ bool MyTranslator::part(t_Variable &result){
                     return false;
                 }
 
+                end_characters.push({"]"});
                 if (!rightPart(tmp)) return false;
+                end_characters.pop();
 
                 color.setAlphaF(tmp.value.toFloat());
             }else if (is("]",1)){
                 color.setAlphaF(0.8);
-            }else{
-                throwError("после '"+*word+"' должна быть запятая или закрывающая квадратная скобка");
-                return false;
             }
         }else if (result.type == "color"){
             throwError("после '"+*word+"' должна быть запятая");
             return false;
         }
 
-        if (!is("]",1)){
-            throwError("после " + *word + "должна быть закрывающая квадратная скобка");
-            return false;
-        }
         word++;
 
         if (result.type == "color"){
             result.value.setValue(color);
-
-            return getFloatOnColor(result);
         }else{
             result.value.setValue(tmp_point);
             result.type = "vector";
 
-            return getFloatOnPoint(result);
+            if (!getFloatOnPoint(result)) return false;
         }
+    }else if (is(")") || is("]") || is("]") || is("-") || is("+") || is("*") || is("/") || is(";")){
+        throwError("перед " + *word + " ожидалось выражение или переменная\n\nВозможные варианты:\n -'num'\n -'vector'\n -'point'\n -'figure'");
+        return false;
     }else if (getNum(result)){
         result.type = "num";
     }else if (getVariable()){
         result = ObjList[*word];
 
         if (result.type == "figure"){
-            return getPointOnFigure(result);
+            if (!getPointOnFigure(result)) return false;
         }else if (result.type == "point" || result.type == "vector"){
-            return getFloatOnPoint(result);
+            if (!getFloatOnPoint(result)) return false;
         }
     }else return false;
 
-    return true;
-}
+    amountOfParts++;
 
-bool MyTranslator::getFloatOnColor(t_Variable &result){
-    if (is("Red",1)){
+    if (requereAttr && amountOfParts == 1){
+        if (result.type == "figure"){
+            if (is("FillColor",1) || is("StrokeColor",1) || is("DotColor",1)){
+                word++;
+
+                if (is("FillColor")) result.value.setValue(result.value.value<t_Figure>().FillColor);
+                else if (is("StrokeColor")) result.value.setValue(result.value.value<t_Figure>().FillColor);
+                else if (is("DotColor")) result.value.setValue(result.value.value<t_Figure>().FillColor);
+
+                result.type = "color";
+            }else if (is("StrokeWidth",1) || is("DotRadius",1)){
+                word++;
+
+                if (is("StrokeWidth")) result.value.setValue(result.value.value<t_Figure>().StrokeWidth);
+                else if (is("DotRadius")) result.value.setValue(result.value.value<t_Figure>().DotRadius);
+
+                result.type = "num";
+            }else if ((word+1) != inputData.end() && !is(";",1)){
+                if (requeredType == "num"){
+                    throwError("У фигур нет такого параметра '"+CutWord(*(word+1))+"'.\n\nОжидалось:\n- 'FillColor'\n- 'StrokeColor'\n- 'DotColor'\n- 'StrokeWidth'\n- 'DotRadius'");
+                }else if (requeredType == "color"){
+                    throwError("У фигур нет такого параметра '"+CutWord(*(word+1))+"'.\n\nОжидалось:\n- 'FillColor'\n- 'StrokeColor'\n- 'DotColor'");
+                }
+                return false;
+            }else{
+                if (requeredType == "num"){
+                    throwError("После '"+CutWord(*word)+"' ожидался один из следующих атрибутов фигуры:\n- 'FillColor'\n- 'StrokeColor'\n- 'DotColor'\n- 'StrokeWidth'\n- 'DotRadius'");
+                }else if (requeredType == "color"){
+                    throwError("После '"+CutWord(*word)+"' ожидался один из следующих атрибутов фигуры:\n- 'FillColor'\n- 'StrokeColor'\n- 'DotColor'");
+                }
+                return false;
+            }
+        }
+
+        if (result.type == "color" && requeredType == "num"){
+            if (is("Red",1)){
+                word++;
+                result.type = "num";
+                result.value.setValue(result.value.value<QColor>().redF());
+            }else if (is("Green",1)){
+                word++;
+                result.type = "num";
+                result.value.setValue(result.value.value<QColor>().greenF());
+            }else if (is("Blue",1)){
+                word++;
+                result.type = "num";
+                result.value.setValue(result.value.value<QColor>().blueF());
+            }else if (is("Alpha",1)){
+                word++;
+                result.type = "num";
+                result.value.setValue(result.value.value<QColor>().alphaF());
+            }else if ((word+1) != inputData.end()  && !is(";",1)){
+                throwError("у цвета нет такого параметра '"+CutWord(*(word+1))+"'.\n\nВозможные варианты:\n- 'Red'\n- 'Green'\n- 'Blue'\n- 'Alpha'");
+                return false;
+            }else{
+                throwError("После '"+CutWord(*word)+"' ожидался один из следующих атрибутов цвета:\n- 'Red'\n- 'Green'\n- 'Blue'\n- 'Alpha'");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (is("(",1) || is("[",1) || is("{",1)){
         word++;
-        result.type = "num";
-        result.value.setValue(result.value.value<QColor>().redF());
-    }else if (is("Green",1)){
+        throwError("перед '" + *word + "' ожидалось:\n- '+'\n- '-'\n- '*'\n- '/'\n- ';'");
+        return false;
+    }else if (!(is("(",1) || is("[",1) || is("{",1) || is(")",1) || is("]",1) || is("]",1) || is("-",1) || is("+",1) || is("*",1) || is("/",1) || is(";",1)  || is(",",1))){
         word++;
-        result.type = "num";
-        result.value.setValue(result.value.value<QColor>().greenF());
-    }else if (is("Blue",1)){
-        word++;
-        result.type = "num";
-        result.value.setValue(result.value.value<QColor>().blueF());
-    }else if (is("Alpha",1)){
-        word++;
-        result.type = "num";
-        result.value.setValue(result.value.value<QColor>().alphaF());
+        throwError("перед '" + *word + "' ожидалось:\n- '+'\n- '-'\n- '*'\n- '/'"+"\n- '" + end_characters.top().join("'\n- '")+"'");
+        return false;
+    }else if (result.type != "color"){
+        auto list = DT[result.type];
+        if ((((word+1) == inputData.end())?(true):(!(list.contains(*(word+1)) || end_characters.top().contains(*(word+1)))))){
+            word++;
+
+            throwError(((word != inputData.end())?("вместо '"+ *(word) + "' "):"")  + "ожидалось:"
+                        + (list.empty()?"":("\n- '"+list.join("'\n- '")+"'"))
+                        + "\n- '" + end_characters.top().join("'\n- '")+"'");
+            return false;
+        }
     }
 
     return true;
@@ -1926,24 +2411,19 @@ bool MyTranslator::getFloatOnPoint(t_Variable &result){
         word++;
 
         if (!next()){
-            throwError("введите индекс");
+            throwError("введите индекс ('num')");
             return false;
         }
 
         t_Variable tmp;
         tmp.type = "num";
-        if (!rightPart(tmp)) {
-            throwError("внутри квадратных скобок должен быть обьект типа 'num'");
-            return false;
-        }
+
+        end_characters.push({"]"});
+        if (!rightPart(tmp)) return false;
+        end_characters.pop();
 
         if (!next()){
             throwError("ожидалась закрыващая квадратная скобка");
-            return false;
-        }
-
-        if (!is("]")){
-            throwError("вместо "+CutWord(*word)+" ожидалась закрыващая квадратная скобка");
             return false;
         }
 
@@ -1966,24 +2446,19 @@ bool MyTranslator::getPointOnFigure(t_Variable &result){
         word++;
 
         if (!next()){
-            throwError("введите индекс");
+            throwError("введите индекс ('num')");
             return false;
         }
 
         t_Variable tmp;
         tmp.type = "num";
-        if (!rightPart(tmp)) {
-            throwError("внутри квадратных скобок должен быть обьект типа 'num'");
-            return false;
-        }
+
+        end_characters.push({"]"});
+        if (!rightPart(tmp)) return false;
+        end_characters.pop();
 
         if (!next()){
             throwError("ожидалась закрыващая квадратная скобка");
-            return false;
-        }
-
-        if (!is("]")){
-            throwError("вместо "+CutWord(*word)+" ожидалась закрыващая квадратная скобка");
             return false;
         }
 
@@ -2003,6 +2478,8 @@ bool MyTranslator::getPointOnFigure(t_Variable &result){
 
         result.value.setValue(list.at(id%(list.size()-1)));
     }
+
+    if (!getFloatOnPoint(result)) return false;
 
     return true;
 }
